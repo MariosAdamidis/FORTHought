@@ -4,6 +4,8 @@
 
 An open-source, interpretable platform for AI-accelerated scientific discovery, designed to function as a true research collaborator.
 
+![image](https://github.com/user-attachments/assets/1be05040-7563-4d58-a988-011b3a696ecf)
+
 ---
 
 ### 🔭 The Vision: A Digital Colleague for Every Lab
