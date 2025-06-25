@@ -1,10 +1,17 @@
-# 🧠 Project FORTHought
-
-[![Status](https://img.shields.io/badge/Status-Alpha-orange.svg)](https://github.com/MariosAdamidis/FORTHought) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
+<table>
+  <tr>
+    <td width="150" align="center">
+      <img src="assets/forthought-logo.png" alt="Project FORTHought Logo"/>
+    </td>
+    <td>
+      <h1>🧠 Project FORTHought 🚀</h1>
+      <a href="https://github.com/MariosAdamidis/FORTHought/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+      <a href="#"><img src="https://img.shields.io/badge/Status-Alpha-orange.svg" alt="Status: Alpha"></a>
+      <br/>
+    </td>
+  </tr>
+</table>
 An open-source, interpretable platform for AI-accelerated scientific discovery, designed to function as a true research collaborator.
-
-![image](https://github.com/user-attachments/assets/1be05040-7563-4d58-a988-011b3a696ecf)
 
 ---
 
