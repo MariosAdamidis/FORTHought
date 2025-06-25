@@ -1,0 +1,29 @@
+{
+  "mcpServers": {
+    "time": {
+      "command": "uvx",
+      "args": ["mcp-server-time", "--local-timezone=Europe/Athens"]
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "materials_project": {
+      "command": "uv",
+      "args": [
+        "run", 
+        "--directory",
+        "/opt/mcp-science/servers/materials-project",
+        "--with", 
+        "mcp[cli],aiohttp,pydantic,mp-api,pymatgen,emmet-core", 
+        "python",
+        "-m",
+        "materials_project"
+      ]
+    },
+    "quickchart": {
+      "command": "npx",
+      "args": ["-y", "@gongrzhe/quickchart-mcp-server"]
+    }
+  }
+}
