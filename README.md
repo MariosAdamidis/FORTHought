@@ -1,4 +1,4 @@
-# 🚀 Project FORTHought
+# 🧠 Project FORTHought
 
 [![Status](https://img.shields.io/badge/Status-Alpha-orange.svg)](https://github.com/MariosAdamidis/FORTHought) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -6,7 +6,7 @@ An open-source, interpretable platform for AI-accelerated scientific discovery, 
 
 ---
 
-### 💡 The Vision: A Digital Colleague for Every Lab
+### 🔭 The Vision: A Digital Colleague for Every Lab
 
 Scientific progress is drowning in a sea of its own success. We generate more data and publish more papers than ever before, but our ability to synthesize this information remains human-limited. Project FORTHought was born from a simple but ambitious question: What if every researcher, in any lab, could have an AI collaborator capable of understanding their unique context, reasoning about their complex data, and helping to accelerate the pace of discovery?
 
@@ -20,7 +20,7 @@ The development of FORTHought is guided by three core principles:
 2.  **Integration over Reinvention:** The project's strength comes from selecting the best open-source components and orchestrating them into a cohesive, powerful system. The innovation lies in the architecture and the solution to a specific problem, not in reinventing every wheel.
 3.  **Interpretability by Design:** A "black box" AI is of limited use in science. A core goal is to build a system where the AI's reasoning can be traced, understood, and trusted, allowing it to be a true collaborator rather than just an oracle.
 
-### ✨ Current Features & Validated Capabilities
+### ⚙️ Current Features & Validated Capabilities
 
 The platform is currently in an alpha stage, but the foundational layer is operational and has been validated on a number of complex workflows:
 
@@ -64,7 +64,7 @@ This setup is designed to run on a **Windows Host with WSL2 and an AMD GPU**.
     * **Jupyter Lab:** `http://localhost:8888`
 
 ### 🏗️ Architecture
-*(Here you can insert a screenshot of your architecture diagram from your status update PDF)*
+![image](https://github.com/user-attachments/assets/1c754032-5735-4296-b575-3fe926ecf37d)
 
 ### 🛣️ Roadmap & Future Goals
 
