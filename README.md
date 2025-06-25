@@ -13,6 +13,7 @@
 </table>
 An open-source, interpretable platform for AI-accelerated scientific discovery, designed to function as a true research collaborator.
 
+THIS IS A WORK IN PROGRESS...
 ---
 
 ### 🔭 The Vision: A Digital Colleague for Every Lab
