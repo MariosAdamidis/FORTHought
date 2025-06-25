@@ -1,0 +1,31 @@
+# Environment variables - NEVER commit this file!
+.env
+
+# Python bytecode and caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE and editor specific files
+.vscode/
+.idea/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Data, Uploads, and Large Files
+# You generally do not want to commit datasets or user uploads.
+# Add specific files or folders you want to ignore. For example:
+# data/large_dataset.csv
+open_webui_data/uploads/*
+open_webui_data/logs/*
+!open_webui_data/uploads/.gitkeep
+
+# Caches for models and libraries - These are large and can be redownloaded
+hf/
+docling-cache/
+
+# Log files
+*.log
