@@ -8,7 +8,7 @@ An open-source, interpretable platform for AI-accelerated scientific discovery, 
 
 ### 💡 The Vision: A Digital Colleague for Every Lab
 
-Scientific progress is drowning in a sea of its own success. [cite_start]We generate more data and publish more papers than ever before, but our ability to synthesize this information remains human-limited[cite: 91]. [cite_start]Project FORTHought was born from a simple but ambitious question: What if every researcher, in any lab, could have an AI collaborator capable of understanding their unique context, reasoning about their complex data, and helping to accelerate the pace of discovery? [cite: 93]
+Scientific progress is drowning in a sea of its own success. We generate more data and publish more papers than ever before, but our ability to synthesize this information remains human-limited. Project FORTHought was born from a simple but ambitious question: What if every researcher, in any lab, could have an AI collaborator capable of understanding their unique context, reasoning about their complex data, and helping to accelerate the pace of discovery?
 
 This project is my first step towards building that future. It’s not just about creating another tool, but about architecting an ecosystem where AI can be securely and effectively integrated into the day-to-day scientific process, from messy experimental data to publishable insights.
 
@@ -16,20 +16,20 @@ This project is my first step towards building that future. It’s not just abou
 
 The development of FORTHought is guided by three core principles:
 
-1.  [cite_start]**Democratization of Research:** Advanced AI capabilities should not be confined to a few well-funded institutions[cite: 92]. By building on open-source tools and enabling deployment on local hardware, FORTHought aims to make powerful research assistants accessible to all.
+1.  **Democratization of Research:** Advanced AI capabilities should not be confined to a few well-funded institutions. By building on open-source tools and enabling deployment on local hardware, FORTHought aims to make powerful research assistants accessible to all.
 2.  **Integration over Reinvention:** The project's strength comes from selecting the best open-source components and orchestrating them into a cohesive, powerful system. The innovation lies in the architecture and the solution to a specific problem, not in reinventing every wheel.
-3.  **Interpretability by Design:** A "black box" AI is of limited use in science. [cite_start]A core goal is to build a system where the AI's reasoning can be traced, understood, and trusted, allowing it to be a true collaborator rather than just an oracle[cite: 105, 106, 107].
+3.  **Interpretability by Design:** A "black box" AI is of limited use in science. A core goal is to build a system where the AI's reasoning can be traced, understood, and trusted, allowing it to be a true collaborator rather than just an oracle.
 
 ### ✨ Current Features & Validated Capabilities
 
-[cite_start]The platform is currently in an alpha stage, but the foundational layer is operational and has been validated on a number of complex workflows[cite: 86]:
+The platform is currently in an alpha stage, but the foundational layer is operational and has been validated on a number of complex workflows:
 
-* [cite_start]**Hybrid Document Intelligence:** A robust RAG-first system that uses a specialized engine (Docling) for primary analysis and intelligently falls back to a rich set of local PDF/OCR libraries (`pdfplumber`, `pymupdf`) for low-level metadata extraction and verification[cite: 20, 64, 128].
-* **Self-Correcting Code Interpreter:** An enhanced, GPU-accelerated Jupyter environment with a comprehensive scientific and data analysis stack. [cite_start]It can autonomously recover from initial code errors and refine its scripts to successfully complete tasks[cite: 21, 66, 129, 165].
-* [cite_start]**Scientific Tool Integration:** Seamlessly connects to real-world scientific databases like the **Materials Project** via a custom MCP orchestrator, allowing for complex, multi-tool workflows[cite: 19, 68, 127, 164].
-* [cite_start]**Full Office Suite Manipulation:** Programmatic creation and editing of Word (`.docx`), PowerPoint (`.pptx`), and complex multi-sheet Excel (`.xlsx`) files via the Code Interpreter[cite: 22, 163].
-* [cite_start]**Advanced Visualization:** Capable of generating publication-quality static plots (`matplotlib`, `seaborn`) and interactive 3D visualizations (`plotly`)[cite: 23, 128, 166].
-* [cite_start]**Secure Global Collaboration:** Built to allow secure, HTTPS-encrypted external access for file sharing and interaction via Cloudflare tunnels[cite: 24, 130].
+* **Hybrid Document Intelligence:** A robust RAG-first system that uses a specialized engine (Docling) for primary analysis and intelligently falls back to a rich set of local PDF/OCR libraries for verification and low-level tasks.
+* **Self-Correcting Code Interpreter:** An enhanced, GPU-accelerated Jupyter environment with a comprehensive scientific stack that can autonomously recover from code errors and refine its scripts to successfully complete tasks.
+* **Scientific Tool Integration:** Seamlessly connects to real-world scientific databases like the **Materials Project** via a custom MCP orchestrator, allowing for complex, multi-tool chained workflows.
+* **Full Office Suite Manipulation:** Programmatic creation and editing of Word (`.docx`), PowerPoint (`.pptx`), and complex multi-sheet Excel (`.xlsx`) files via the Code Interpreter.
+* **Advanced Visualization:** Capable of generating publication-quality static plots (`matplotlib`, `seaborn`) and interactive 3D visualizations (`plotly`).
+* **Secure Global Collaboration:** Built to allow secure, HTTPS-encrypted external access for file sharing and interaction via Cloudflare tunnels.
 
 ### 🛠️ System Requirements & Setup
 
@@ -37,8 +37,8 @@ This setup is designed to run on a **Windows Host with WSL2 and an AMD GPU**.
 
 #### 1. Host System Setup (Windows)
 * **LM Studio:** Download and install LM Studio.
-    * [cite_start]Download the following models: `Qwen 3 0.6b` (for embeddings) and `Qwen 2.5 vl 3b` (for Vision/VLM)[cite: 17, 132].
-    * [cite_start]Navigate to the "Local Server" tab (`</>`), load both models, and start the server on Port `1234`[cite: 27, 135].
+    * Download the following models: `Qwen 3 0.6b` (for embeddings) and `Qwen 2.5 vl 3b` (for Vision/VLM).
+    * Navigate to the "Local Server" tab (`</>`), load both models, and start the server on Port `1234`.
 
 #### 2. Project Setup (WSL2)
 1.  **Clone the Repository:**
@@ -64,16 +64,16 @@ This setup is designed to run on a **Windows Host with WSL2 and an AMD GPU**.
     * **Jupyter Lab:** `http://localhost:8888`
 
 ### 🏗️ Architecture
-[cite_start]*(Here you can insert a screenshot of your architecture diagram from your status update PDF [cite: 17, 131])*
+*(Here you can insert a screenshot of your architecture diagram from your status update PDF)*
 
 ### 🛣️ Roadmap & Future Goals
 
 This project is under active development. The future goals are divided into technical enhancements and broader research ambitions.
 
 #### Technical Enhancements
-* [cite_start][ ] **Container Security Hardening:** Transition from permissive development settings to a secure production environment by implementing non-root users and strict seccomp profiles[cite: 75, 77, 79, 175].
-* [cite_start][ ] **Performance Monitoring:** Integrate Prometheus and Grafana for real-time dashboards on container health and resource utilization[cite: 81].
-* [cite_start][ ] **Expand Scientific Tooling:** Incrementally add new scientific databases and tools, such as PubChem for chemical data[cite: 82].
+* [ ] **Container Security Hardening:** Transition from permissive development settings to a secure production environment by implementing non-root users and strict seccomp profiles.
+* [ ] **Performance Monitoring:** Integrate Prometheus and Grafana for real-time dashboards on container health and resource utilization.
+* [ ] **Expand Scientific Tooling:** Incrementally add new scientific databases and tools, such as PubChem for chemical data.
 
 #### Research & Publication Goals
 * [ ] **Publish a Systems Paper:** Formally document the FORTHought architecture, its features, and its utility in a peer-reviewed journal.
