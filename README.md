@@ -4,7 +4,7 @@
       <img src="assets/forthought-logo.png" alt="Project FORTHought Logo"/>
     </td>
     <td>
-      <h1>🧠 Project FORTHought 🚀</h1>
+      <h1>🧠 Project FORTHought </h1>
       <a href="https://github.com/MariosAdamidis/FORTHought/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
       <a href="#"><img src="https://img.shields.io/badge/Status-Alpha-orange.svg" alt="Status: Alpha"></a>
       <br/>
