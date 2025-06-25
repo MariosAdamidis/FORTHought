@@ -84,9 +84,27 @@ This project is under active development. The future goals are divided into tech
 
 This is an independent project born out of a passion for science and AI. Contributions, feature requests, and discussions are all welcome. Please feel free to open an issue to report a bug or suggest a feature.
 
-### 🙏 Acknowledgements
+### 🙏 Acknowledgements & Community
 
-Project FORTHought stands on the shoulders of giants. It is an integration of many incredible open-source projects, and I am deeply grateful to the creators and maintainers of key components like **Open WebUI**, **Docling**, and **Unsloth**.
+Project FORTHought stands on the shoulders of giants. It is an integration of many incredible open-source projects, and its success would not be possible without their creators and maintainers.
+
+#### Core Dependencies & Inspirations
+
+* **[Open WebUI](https://github.com/open-webui/open-webui):** Provides the excellent, user-friendly chat interface that serves as the primary hub for the platform.
+* **[UnslothAI](https://github.com/unslothai/unsloth):** The core library for making LLM inference and fine-tuning dramatically more efficient on local hardware. The Jupyter environment is built with Unsloth in mind.
+* **[Docling](https://github.com/docling-project/docling):** The powerful document and image extraction engine that forms the core of the RAG pipeline.
+* **[SearXNG](https://github.com/searxng/searxng):** The private, hackable metasearch engine that provides the `RAG_WEB_SEARCH` capability.
+* **[Jupyter](https://github.com/jupyter):** The foundational project behind the interactive code interpreter environment.
+* **[LM Studio](https://github.com/lmstudio-ai):** The provider of the intuitive desktop application used for serving local models to the platform.
+* **[Model Context Protocol (MCP)](https://github.com/open-webui/mcpo):** The emerging standard used for orchestrating calls to external tools and services.
+* **[Materials Project](https://github.com/materialsproject):** The provider of the essential scientific database and API that demonstrates the platform's utility for real-world research.
+* **[Upstash Context7](https://github.com/upstash/context7):** An example of a useful MCP tool integrated into the platform's toolset.
+
+#### Community & Special Thanks
+
+This project was built not just on code, but on community knowledge. I want to extend a special thank you to the contributors of the following Reddit thread:
+
+* **A huge thank you to the r/LocalLLaMA community**, specifically the contributors in the **["ROCm 6.4 current unsloth working"](https://www.reddit.com/r/LocalLLaMA/comments/1kp6gdv/rocm_64_current_unsloth_working/)** thread. Their shared solutions and patches were absolutely critical for getting the Unsloth library to function correctly with ROCm on an AMD GPU. This project would have been stalled without their help.
 
 ### License
 
