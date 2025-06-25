@@ -1,0 +1,133 @@
+version: '3.8'
+
+services:
+  unsloth-jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: unsloth-wsl-jupyter-img
+    container_name: unsloth_wsl_jupyter_container
+    devices:
+      - /dev/dxg:/dev/dxg
+    volumes:
+      - ./data:/data
+      - ./hf:/root/.cache/huggingface
+      - /usr/lib/wsl/lib/libdxcore.so:/usr/lib/wsl/lib/libdxcore.so:ro
+      - /opt/rocm-6.3.4/lib/libhsa-runtime64.so.1:/opt/rocm/lib/libhsa-runtime64.so.1:ro
+      # ─── NEW: mount the OpenWebUI uploads into Jupyter ─────────────────────────
+      - ./open_webui_data/uploads:/data/uploads
+    ports:
+      - "8888:8888"
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp:unconfined
+    ipc: host
+    restart: unless-stopped
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open_webui_container
+    volumes:
+      - ./open_webui_data:/app/backend/data
+    ports:
+      - "8081:8080"
+    environment:
+      - 'OLLAMA_BASE_URL=http://host.docker.internal:11434'
+      - 'ENABLE_CODE_INTERPRETER=True'
+      - 'CODE_INTERPRETER_ENGINE=jupyter'
+      - 'CODE_INTERPRETER_JUPYTER_URL=http://unsloth-jupyter:8888'
+      - 'CODE_INTERPRETER_JUPYTER_AUTH=password'
+      - 'CODE_INTERPRETER_JUPYTER_PASSWORD=Jupyter1998'
+      - 'ENABLE_RAG_WEB_SEARCH=True'
+      - 'RAG_WEB_SEARCH_ENGINE=searxng'
+      - 'SEARXNG_INSTANCE_URL=http://searxng:8080'
+      # Docling integration
+      - 'RAG_CONTENT_EXTRACTION_ENGINE=docling'
+      - 'DOCLING_SERVER_URL=http://host.docker.internal:5001'
+      - 'AIOHTTP_CLIENT_TIMEOUT=3600'
+      - 'RAG_FILE_MAX_SIZE=200'
+      - 'RAG_FILE_MAX_COUNT=10'
+    depends_on:
+      - unsloth-jupyter
+      - searxng
+      - mcpo
+      - docling-serve
+    restart: unless-stopped
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng_container
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    env_file:
+      - .env.searxng
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE
+
+  mcpo:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcpo
+    container_name: webui-mcpo-server
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./mcpo:/opt/mcpo
+      - ./data:/data:rw
+    restart: unless-stopped
+
+  fileserver:
+    build:
+      context: .
+      dockerfile: Dockerfile.fileserver
+    container_name: fileserver_container
+    ports:
+      - "8084:8000"
+    volumes:
+      - ./data:/shared_data:ro
+    restart: unless-stopped
+
+  docling-serve:
+    image: quay.io/docling-project/docling-serve-cpu:latest
+    container_name: docling_serve_container
+    environment:
+      - DOCLING_SERVE_ENABLE_UI=true
+      - DOCLING_SERVE_ENABLE_REMOTE_SERVICES=true
+      - OMP_NUM_THREADS=24
+      - MKL_NUM_THREADS=24
+      - OPENBLAS_NUM_THREADS=24
+      - NUMBA_NUM_THREADS=24
+      - PYTORCH_NUM_THREADS=24
+      - TF_NUM_INTRAOP_THREADS=24
+      - TF_NUM_INTEROP_THREADS=2
+      - DOCLING_SERVE_MAX_SYNC_WAIT=1800
+      - DOCLING_SERVE_TIMEOUT=3600
+      - UVICORN_TIMEOUT_KEEP_ALIVE=65
+      - UVICORN_TIMEOUT_GRACEFUL_SHUTDOWN=30
+      - HF_HOME=/tmp/
+      - TORCH_HOME=/tmp/
+    ports:
+      - "5001:5001"
+    volumes:
+      - docling-cache:/root/.cache/docling
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '24'
+        reservations:
+          cpus: '20'
+
+volumes:
+  open_webui_data:
+  searxng_data:
+  docling-cache:
