@@ -104,7 +104,7 @@ Project FORTHought stands on the shoulders of giants. It is an integration of ma
 
 This project was built not just on code, but on community knowledge. I want to extend a special thank you to the contributors of the following Reddit thread:
 
-* **A huge thank you to the r/LocalLLaMA community**, specifically the contributors in the **["ROCm 6.4 current unsloth working"](https://www.reddit.com/r/LocalLLaMA/comments/1kp6gdv/rocm_64_current_unsloth_working/)** thread. Their shared solutions and patches were absolutely critical for getting the Unsloth library to function correctly with ROCm on an AMD GPU. This project would have been stalled without their help.
+* **A huge thank you to the r/LocalLLaMA community**, specifically the contributor Ok_Ocelot2268 in the **["ROCm 6.4 current unsloth working"](https://www.reddit.com/r/LocalLLaMA/comments/1kp6gdv/rocm_64_current_unsloth_working/)** thread. Their shared solutions and patches were absolutely critical for getting the Unsloth library to function correctly with ROCm on an AMD GPU. This project would have been stalled without their help.
 
 ### License
 
