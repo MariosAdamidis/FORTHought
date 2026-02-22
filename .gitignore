@@ -1,0 +1,64 @@
+# =============================================================================
+# FORTHought .gitignore — Hardened for GitHub push
+# =============================================================================
+
+# ── Secrets & credentials (NEVER commit) ─────────────────────────────────────
+.env
+.env.local
+.env.production
+secrets/
+google_credentials.json
+cloudflared/*.json
+mcp-academic-download/cookies.txt
+
+# ── Runtime data ─────────────────────────────────────────────────────────────
+/data/
+/open_webui_data/
+/open_webui_data_backup*/
+/backups/
+/uploads/
+/hf/
+
+# ── Archive & old snapshots ──────────────────────────────────────────────────
+/_archive/
+*.tgz
+*.tar.gz
+
+# ── Python cache ─────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+.mypy_cache/
+.pytest_cache/
+
+# ── Backup files ─────────────────────────────────────────────────────────────
+*.bak
+*.bak.*
+*.old
+*.orig
+
+# ── IDE & editor ─────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── OS files ─────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Docker build artifacts ───────────────────────────────────────────────────
+# (images are built from Dockerfiles, no need to track layers)
+
+# ── Jupyter artifacts ────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+Untitled*.ipynb
+
+# ── Test images & PDFs left in root ──────────────────────────────────────────
+/test_sem_*.png
+/your_sem_*.png
+/*.pdf
+
+# ── Stale experiments (keep list for awareness) ──────────────────────────────
+/ops/manifests/

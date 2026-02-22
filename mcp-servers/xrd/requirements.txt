@@ -1,0 +1,8 @@
+numpy>=1.24.0
+scipy>=1.10.0
+matplotlib>=3.7.0
+pymatgen>=2024.1.1
+mp-api>=0.41.0
+mcp>=1.0.0
+requests>=2.31.0
+Pillow>=10.0.0

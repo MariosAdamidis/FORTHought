@@ -1,0 +1,916 @@
+# =============================================================================
+# FORTHought Stack v2.9
+# =============================================================================
+# Usage:
+#   export PS_TAG=ps-2025-12-12
+#   docker compose --profile core up -d              # core only
+#   docker compose --profile core --profile extras up -d  # everything
+#
+# Tool services (mcp-files, mcp-papers, mcp-micro) run as persistent HTTP
+# servers instead of ephemeral STDIO processes. This eliminates idle-death
+# and double-spawn issues. See the MCP TOOL SERVICES section below.
+# =============================================================================
+
+name: forthought
+
+services:
+  # ===========================================================================
+  # CORE
+  # ===========================================================================
+
+  unsloth-jupyter:
+    profiles: ["core"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        JUPYTER_PASSWORD: ${JUPYTER_PASSWORD}
+    image: unsloth-wsl-jupyter-img
+    container_name: unsloth_wsl_jupyter_container
+    command: >
+      jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --notebook-dir=/data
+      --IdentityProvider.token=${JUPYTER_TOKEN}
+      --ServerApp.disable_check_xsrf=True
+    devices:
+      - /dev/dxg:/dev/dxg
+    volumes:
+      - ./data:/data
+      - ./hf:/root/.cache/huggingface
+      - /usr/lib/wsl/lib/libdxcore.so:/usr/lib/wsl/lib/libdxcore.so:ro
+      - /opt/rocm/lib/libhsa-runtime64.so.1:/opt/rocm/lib/libhsa-runtime64.so.1:ro
+      - ./open_webui_data/uploads:/data/uploads
+    ports:
+      - "127.0.0.1:8888:8888"
+    cap_add: [SYS_PTRACE]
+    security_opt: ["seccomp:unconfined"]
+    ipc: host
+    restart: unless-stopped
+    networks: [default, edge]
+
+  open-webui:
+    profiles: ["core"]
+    image: ghcr.io/open-webui/open-webui:0.8.3
+    container_name: open_webui_container
+    volumes:
+      - ./open_webui_data:/app/backend/data
+      - ./secrets/google_credentials.json:/app/backend/data/google_credentials.json:ro
+    ports:
+      - "127.0.0.1:8081:8080"
+    environment:
+      - WEBUI_NAME=FORTHought
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/backend/data/google_credentials.json
+      - ENABLE_OLLAMA_API=False
+      - ENABLE_OPENAI_API=True
+      - OPENAI_API_BASE_URL=http://host.docker.internal:1234/v1
+      - OPENAI_API_KEY=not-needed
+      - MODELS_CACHE_TTL=300
+      - THREAD_POOL_SIZE=80
+      - CHAT_RESPONSE_STREAM_DELTA_CHUNK_SIZE=12
+      - AIOHTTP_CLIENT_TIMEOUT=3600
+      - REQUEST_TIMEOUT=300
+      - VECTOR_DB=qdrant
+      - QDRANT_URI=http://qdrant:6333
+      - ENABLE_QDRANT_MULTITENANCY_MODE=True
+      - ENABLE_RAG_WEB_SEARCH=False
+      - RAG_SYSTEM_CONTEXT=True
+      - RAG_CONTENT_EXTRACTION_ENGINE=docling
+      - DOCLING_SERVER_URL=${DOCLING_SERVER_URL:-http://localhost:5005/}
+      - ENABLE_CODE_INTERPRETER=True
+      - CODE_EXECUTION_ENGINE=jupyter
+      - CODE_EXECUTION_JUPYTER_URL=http://unsloth-jupyter:8888
+      - CODE_EXECUTION_JUPYTER_AUTH=password
+      - CODE_EXECUTION_JUPYTER_PASSWORD=${JUPYTER_PASSWORD}
+      - OWUI_CHARTS_URL=${OWUI_CHARTS_URL:-http://localhost:9001/charts}
+      - ENABLE_API_KEY=True
+      - USER_PERMISSIONS_WORKSPACE_TOOLS_ACCESS=True
+      - METAMCP_BASE_URL=http://metamcp:12008/metamcp
+      - METAMCP_API_KEY=${METAMCP_API_KEY}
+    depends_on:
+      - unsloth-jupyter
+      - qdrant
+      - metamcp
+      - fileserver
+      - chart_server
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    networks: [default, edge]
+
+  owui-pipelines:
+      profiles: ["core"]
+      image: ghcr.io/open-webui/pipelines:main
+      container_name: owui_pipelines
+      environment:
+      - PIPELINES_API_KEY=0p3n-w3bu!
+      ports:
+        - "127.0.0.1:9099:9099"
+      extra_hosts:
+        - "host.docker.internal:host-gateway"
+      deploy:
+        resources:
+          limits:
+            memory: 512M
+      restart: unless-stopped
+      networks: [default]
+
+  qdrant:
+    profiles: ["core"]
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    volumes:
+      - qdrant_data:/qdrant/storage
+    expose: ["6333", "6334"]
+    restart: unless-stopped
+    networks: [default]
+    healthcheck:
+      test: ["CMD-SHELL", "bash -lc 'timeout 5 bash -lc \":> /dev/tcp/127.0.0.1/6333\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  fileserver:
+    profiles: ["core"]
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.fileserver
+    image: forthought-fileserver
+    container_name: fileserver_container
+    ports:
+      - "127.0.0.1:8084:8000"
+    environment:
+      - FILES_ROOT=/shared_data
+      - FILESERVER_SECRET=${FILESERVER_SECRET}
+      - FILESERVER_INTERNAL_TOKEN=${FILESERVER_INTERNAL_TOKEN}
+    volumes:
+      - ./data/files:/shared_data/files:rw
+      - ./scripts/fileserver_app.py:/app/fileserver_app.py:ro
+    restart: unless-stopped
+    networks: [default, edge]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)\""]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  metamcp:
+    profiles: ["core"]
+    build:
+      context: ./metamcp_custom
+    container_name: metamcp
+    user: root
+    ports:
+      - "127.0.0.1:12008:12008"
+    environment:
+      - XDG_CONFIG_HOME=/root/.config
+      - TMPDIR=/sandbox-tmp
+      - APP_URL=${METAMCP_APP_URL}
+      - POSTGRES_PASSWORD=${METAMCP_POSTGRES_PASSWORD}
+      - BETTER_AUTH_SECRET=${METAMCP_AUTH_SECRET}
+      - MP_API_KEY=${MP_API_KEY}
+      - OPENALEX_MAILTO=${OPENALEX_MAILTO}
+      - UNSPLASH_ACCESS_KEY=${UNSPLASH_ACCESS_KEY}
+      - DATABASE_URL=postgresql://postgres:${METAMCP_POSTGRES_PASSWORD}@metamcp_postgres:5432/postgres
+      - FILESERVER_INTERNAL_URL=http://fileserver:8000
+      - FILESERVER_INTERNAL_TOKEN=${FILESERVER_INTERNAL_TOKEN}
+      - PUBLIC_FILES_BASE_URL=${PUBLIC_FILES_BASE_URL:-http://localhost:8084}
+      - FILE_EXPORT_BASE_URL=${PUBLIC_FILES_BASE_URL:-http://localhost:8084}/files
+      - FILE_EXPORT_DIR=/data/files
+      - PRESENTON_BASE_URL=http://presenton:80
+      - PYTHONPATH=/opt/file-export
+      - OPEN_WEBUI_BASE_URL=http://open-webui:8080
+      - OPEN_WEBUI_API_KEY=${JWT_TOKEN}
+      - UV_CACHE_DIR=/uv-cache
+    depends_on:
+      metamcp_postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [default, edge]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./data:/data:rw
+      - metamcp_uv_cache:/uv-cache
+      - type: bind
+        source: ./open_webui_data/uploads
+        target: /openwebui_uploads
+        read_only: true
+      # --- Source code mounts (still needed for codemode STDIO tools: img, etc.) ---
+      - type: bind
+        source: ./mcp-file-export
+        target: /opt/file-export
+        read_only: true
+      - type: bind
+        source: ./mcp-science
+        target: /opt/mcp-science
+        read_only: true
+      - type: bind
+        source: ./mcp-presenton-adapter
+        target: /opt/mcp-presenton-adapter
+        read_only: true
+      - type: bind
+        source: ./skills
+        target: /opt/skills
+        read_only: true
+      - type: bind
+        source: ./data/sandbox-tmp
+        target: /sandbox-tmp
+
+  metamcp_postgres:
+    profiles: ["core"]
+    image: postgres:16-alpine
+    container_name: metamcp_postgres
+    environment:
+      - POSTGRES_PASSWORD=${METAMCP_POSTGRES_PASSWORD}
+    volumes:
+      - metamcp_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      default:
+        aliases:
+          - postgres
+
+  chart_server:
+    profiles: ["core"]
+    build:
+      context: ./chart_server
+    container_name: chart_server
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9001:9001"
+    networks: [default, edge]
+
+  cloudflared:
+    profiles: ["core"]
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    networks: [edge]
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+
+  # ===========================================================================
+  # MCP TOOL SERVICES — Persistent HTTP servers
+  # ===========================================================================
+  # These replace the ephemeral STDIO processes that MetaMCP used to spawn.
+  # Each runs as its own container with auto-restart and health checks.
+  #
+  # PREREQUISITES (one-time patches before first launch):
+  #   - papers.py: patch FastMCP constructor + __main__ block (see deployment notes)
+  #   - micro.py:  patch FastMCP constructor + __main__ block (see deployment notes)
+  #   - file_export_mcp.py: already supports MODE=http (no changes needed)
+  # ===========================================================================
+
+  mcp-files:
+    profiles: ["core"]
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    container_name: mcp_files
+    working_dir: /opt/file-export
+    command: >
+      uv run
+      --python 3.12
+      --directory /opt/file-export
+      --with mcp[cli]
+      --with fastapi
+      --with uvicorn
+      --with python-multipart
+      --with Pillow
+      --with openpyxl
+      --with reportlab
+      --with py7zr
+      --with emoji
+      --with pyunsplash
+      --with python-dotenv
+      --with markdown2
+      --with bs4
+      --with python-pptx
+      --with python-docx
+      --with lxml
+      --
+      python -u -m tools.file_export_mcp
+    environment:
+      - MODE=http
+      - MCP_HTTP_PORT=9004
+      - MCP_HTTP_HOST=0.0.0.0
+      - OWUI_URL=http://open-webui:8080
+      - JWT_TOKEN=${JWT_TOKEN}
+      - JWT_SECRET=${JWT_SECRET}
+      - PYTHONPATH=/opt/file-export
+      - FILES_DELAY=60
+      - FILE_EXPORT_DIR=/data/files
+      - PERSISTENT_FILES=true
+      - FILE_EXPORT_BASE_URL=${PUBLIC_FILES_BASE_URL:-http://localhost:8084}/files
+      - UNSPLASH_ACCESS_KEY=${UNSPLASH_ACCESS_KEY}
+      - UV_CACHE_DIR=/uv-cache
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data/files:/data/files:rw
+      - mcp_uv_cache:/uv-cache
+      - type: bind
+        source: ./mcp-file-export
+        target: /opt/file-export
+        read_only: true
+      - type: bind
+        source: ./open_webui_data/uploads
+        target: /openwebui_uploads
+        read_only: true
+    expose: ["9004"]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:9004/mcp', timeout=3)\" 2>/dev/null || exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
+    networks: [default]
+
+  mcp-papers:
+    profiles: ["core"]
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    container_name: mcp_papers
+    command: >
+      uv run
+      --no-project
+      --python 3.12
+      --with mcp[cli]
+      --with httpx
+      --with beautifulsoup4
+      --with lxml
+      --
+      python -u /opt/mcp-academic-download/server.py
+    environment:
+          - MODE=http
+          - MCP_HTTP_PORT=9005
+          - MCP_HTTP_HOST=0.0.0.0
+          - FILE_EXPORT_DIR=/data/files
+          - FILE_EXPORT_BASE_URL=${PUBLIC_FILES_BASE_URL:-http://localhost:8084}/files
+          - OPENALEX_MAILTO=${OPENALEX_MAILTO}
+          - OPENALEX_API_KEY=${OPENALEX_API_KEY}
+          - COOKIE_FILE=/opt/mcp-academic-download/cookies.txt
+          - ELSEVIER_API_KEY=${ELSEVIER_API_KEY}
+          - ADS_API_KEY=${ADS_API_KEY}
+          - SEMANTIC_SCHOLAR_API_KEY=${SEMANTIC_SCHOLAR_API_KEY}          
+          - UV_CACHE_DIR=/uv-cache
+          - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data/files:/data/files:rw
+      - mcp_uv_cache:/uv-cache
+      - type: bind
+        source: ./mcp-academic-download
+        target: /opt/mcp-academic-download
+        read_only: true
+    expose: ["9005"]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:9005/mcp', timeout=3)\" 2>/dev/null || exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    restart: unless-stopped
+    networks: [default]
+
+  mcp-micro:
+    profiles: ["core"]
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    container_name: mcp_micro
+    command: >
+      uv run
+      --no-project
+      --python 3.12
+      --with mcp[cli]
+      --with numpy
+      --with scipy
+      --with matplotlib
+      --with pillow
+      --with requests
+      --
+      python -u /opt/mcp-science/mcp-micro/server.py
+    environment:
+      - MODE=http
+      - MCP_HTTP_PORT=9006
+      - MCP_HTTP_HOST=0.0.0.0
+      - OWUI_URL=http://open-webui:8080
+      - JWT_TOKEN=${JWT_TOKEN}
+      - JWT_SECRET=${JWT_SECRET}
+      - FILE_EXPORT_DIR=/data/files
+      - FILE_EXPORT_BASE_URL=${PUBLIC_FILES_BASE_URL:-http://localhost:8084}/files
+      - OWUI_UPLOADS_ROOT=/openwebui_uploads
+      - UV_CACHE_DIR=/uv-cache
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data/files:/data/files:rw
+      - mcp_uv_cache:/uv-cache
+      - type: bind
+        source: ./mcp-science
+        target: /opt/mcp-science
+        read_only: true
+      - type: bind
+        source: ./open_webui_data/uploads
+        target: /openwebui_uploads
+        read_only: true
+    expose: ["9006"]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:9006/mcp', timeout=3)\" 2>/dev/null || exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
+    networks: [default]
+    ports: 
+    - "9006:9006"
+
+  mcp-xrd:
+      profiles: ["core"]
+      image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+      container_name: mcp_xrd
+      command: >
+        uv run
+        --no-project
+        --python 3.12
+        --with mcp[cli]
+        --with numpy
+        --with scipy
+        --with matplotlib
+        --with pillow
+        --with requests
+        --with pymatgen
+        --with mp-api
+        --
+        python -u /opt/mcp-science/mcp-xrd/server.py
+      environment:
+        - MODE=http
+        - MCP_HTTP_PORT=9008
+        - MCP_HTTP_HOST=0.0.0.0
+        - MP_API_KEY=${MP_API_KEY}
+        - OWUI_URL=http://open-webui:8080
+        - JWT_TOKEN=${JWT_TOKEN}
+        - JWT_SECRET=${JWT_SECRET}
+        - FILE_EXPORT_DIR=/data/files
+        - FILE_EXPORT_BASE_URL=${PUBLIC_FILES_BASE_URL:-http://localhost:8084}/files
+        - OWUI_UPLOADS_ROOT=/openwebui_uploads
+        - UV_CACHE_DIR=/uv-cache
+        - PYTHONUNBUFFERED=1
+      volumes:
+        - ./data/files:/data/files:rw
+        - mcp_uv_cache:/uv-cache
+        - type: bind
+          source: ./mcp-science
+          target: /opt/mcp-science
+          read_only: true
+        - type: bind
+          source: ./open_webui_data/uploads
+          target: /openwebui_uploads
+          read_only: true
+      expose: ["9008"]
+      healthcheck:
+        test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:9008/mcp', timeout=3)\" 2>/dev/null || exit 0"]
+        interval: 30s
+        timeout: 10s
+        retries: 3
+        start_period: 120s
+      deploy:
+        resources:
+          limits:
+            memory: 1G
+      restart: unless-stopped
+      networks: [default]
+
+  mcp-pl:
+      profiles: ["core"]
+      image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+      container_name: mcp_pl
+      command: >
+        uv run
+        --no-project
+        --python 3.12
+        --with mcp[cli]
+        --with numpy
+        --with matplotlib
+        --with pillow
+        --with requests
+        --with mp-api
+        --
+        python -u /opt/mcp-science/mcp-pl/server.py
+      environment:
+        - MODE=http
+        - MCP_HTTP_PORT=9010
+        - MCP_HTTP_HOST=0.0.0.0
+        - MP_API_KEY=${MP_API_KEY}
+        - OWUI_URL=http://open-webui:8080
+        - JWT_TOKEN=${JWT_TOKEN}
+        - JWT_SECRET=${JWT_SECRET}
+        - FILE_EXPORT_DIR=/data/files
+        - FILE_EXPORT_BASE_URL=${PUBLIC_FILES_BASE_URL:-http://localhost:8084}/files
+        - OWUI_UPLOADS_ROOT=/openwebui_uploads
+        - UV_CACHE_DIR=/uv-cache
+        - PYTHONUNBUFFERED=1
+      volumes:
+        - ./data/files:/data/files:rw
+        - mcp_uv_cache:/uv-cache
+        - type: bind
+          source: ./mcp-science
+          target: /opt/mcp-science
+          read_only: true
+        - type: bind
+          source: ./open_webui_data/uploads
+          target: /openwebui_uploads
+          read_only: true
+      expose: ["9010"]
+      healthcheck:
+        test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:9010/mcp', timeout=3)\" 2>/dev/null || exit 0"]
+        interval: 30s
+        timeout: 10s
+        retries: 3
+        start_period: 120s
+      deploy:
+        resources:
+          limits:
+            memory: 512M
+      restart: unless-stopped
+      networks: [default]
+
+
+  context7-http:
+    profiles: ["core"]
+    image: ghcr.io/lrstanley/context7-http:latest
+    container_name: context7_http
+    command: ["/app/context7-http", "--bind-addr", "0.0.0.0:8080"]
+    expose: ["8080"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/mcp 2>/dev/null || exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    restart: unless-stopped
+    networks: [default]
+
+  mcp-watchdog:
+    profiles: ["core"]
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    container_name: mcp_watchdog
+    entrypoint: ["python", "-u", "-c"]
+    command:
+      - |
+        import urllib.request, time, datetime, sys
+        endpoints = {
+            "mcp-files":  "http://mcp-files:9004/mcp",
+            "mcp-papers": "http://mcp-papers:9005/mcp",
+            "mcp-micro":  "http://mcp-micro:9006/mcp",
+            "metamcp":    "http://metamcp:12008/metamcp/api/health",
+            "context7":   "http://context7-http:8080/mcp",
+            "mcp-pl":    "http://mcp-pl:9010/mcp",
+        }
+        while True:
+            ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            results = {}
+            for name, url in endpoints.items():
+                try:
+                    urllib.request.urlopen(url, timeout=5)
+                    results[name] = "OK"
+                except Exception as e:
+                    code = getattr(e, 'code', None)
+                    if code and code < 500:
+                        results[name] = "OK"
+                    else:
+                        results[name] = "DOWN"
+            status = " ".join(f"{k}={v}" for k, v in results.items())
+            failures = [k for k, v in results.items() if v != "OK"]
+            if failures:
+                print(f"[{ts}] ALERT {len(failures)} FAILURES: {status}", flush=True)
+            else:
+                print(f"[{ts}] OK: {status}", flush=True)
+            time.sleep(60)
+    restart: unless-stopped
+    networks: [default]
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  # ===========================================================================
+  # EXTRAS
+  # ===========================================================================
+
+  presenton:
+    profiles: ["extras"]
+    image: ghcr.io/presenton/presenton:latest
+    container_name: presenton
+    ports:
+      - "127.0.0.1:5090:80"
+    environment:
+      - CAN_CHANGE_KEYS=false
+      - LLM=custom
+      - CUSTOM_LLM_URL=${CUSTOM_LLM_URL:-http://localhost:1234/v1}
+      - CUSTOM_LLM_API_KEY=not-needed
+      - CUSTOM_MODEL=Qwen3-VL
+      - DISABLE_THINKING=true
+      - DISABLE_ANONYMOUS_TELEMETRY=true
+      - IMAGE_PROVIDER=pexels
+      - PEXELS_API_KEY=${PEXELS_API_KEY}
+    volumes:
+      - ./data/files/presentations:/app_data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    networks: [default, edge]
+
+  mcp-formula:
+      profiles: ["core"]
+      image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+      container_name: mcp_formula
+      command: >
+        uv run
+        --no-project
+        --python 3.12
+        --with mcp[cli]
+        --with pymupdf
+        --with pillow
+        --with requests
+        --
+        python -u /opt/mcp-science/mcp-formula/server.py
+      environment:
+        - MODE=http
+        - MCP_HTTP_PORT=9007
+        - MCP_HTTP_HOST=0.0.0.0
+        - OWUI_URL=http://open-webui:8080
+        - JWT_TOKEN=${JWT_TOKEN}
+        - JWT_SECRET=${JWT_SECRET}
+        - OLLAMA_URL=${OLLAMA_URL:-http://localhost:11434}
+        - OCR_MODEL=glm-ocr
+        - RENDER_DPI=200
+        - OWUI_UPLOADS_ROOT=/openwebui_uploads
+        - UV_CACHE_DIR=/uv-cache
+        - PYTHONUNBUFFERED=1
+      volumes:
+        - mcp_uv_cache:/uv-cache
+        - type: bind
+          source: ./mcp-science
+          target: /opt/mcp-science
+          read_only: true
+        - type: bind
+          source: ./open_webui_data/uploads
+          target: /openwebui_uploads
+          read_only: true
+      expose: ["9007"]
+      healthcheck:
+        test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:9007/mcp', timeout=3)\" 2>/dev/null || exit 0"]
+        interval: 30s
+        timeout: 10s
+        retries: 3
+        start_period: 60s
+      deploy:
+        resources:
+          limits:
+            memory: 512M
+      restart: unless-stopped
+      networks: [default]
+      ports:
+        - "9007:9007"
+
+  # ===========================================================================
+  # DORMANT — Uncomment when needed, volumes are preserved
+  # ===========================================================================
+
+  # stepifi:
+  #   profiles: ["extras"]
+  #   image: stepifi:local
+  #   container_name: stepifi
+  #   ports:
+  #     - "127.0.0.1:3169:3169"
+  #     - "127.0.0.1:3001:3001"
+  #   environment:
+  #     - PORT=3169
+  #     - BULL_BOARD_PORT=3001
+  #     - MAX_FILE_SIZE=${STEPIFI_MAX_FILE_SIZE:-104857600}
+  #     - JOB_TTL_HOURS=${STEPIFI_TTL_HOURS:-24}
+  #     - CLEANUP_CRON=*/15 * * * *
+  #     - DEFAULT_TOLERANCE=0.01
+  #     - RATE_LIMIT_MAX=20
+  #     - MAX_CONCURRENT_JOBS=2
+  #     - REDIS_HOST=stepifi_redis
+  #     - REDIS_PORT=6379
+  #   volumes:
+  #     - stepifi_uploads:/app/uploads
+  #     - ./data/files/stepifi:/app/converted
+  #   depends_on:
+  #     - stepifi_redis
+  #   restart: unless-stopped
+  #   networks: [default, edge]
+
+  # stepifi_redis:
+  #   profiles: ["extras"]
+  #   image: redis:7-alpine
+  #   container_name: stepifi_redis
+  #   volumes:
+  #     - stepifi_redis_data:/data
+  #   restart: unless-stopped
+  #   networks: [default]
+
+  # n8n:
+  #   profiles: ["extras"]
+  #   image: docker.n8n.io/n8nio/n8n:latest
+  #   container_name: n8n_container
+  #   ports:
+  #     - "127.0.0.1:5678:5678"
+  #   environment:
+  #     - GENERIC_TIMEZONE=Europe/Athens
+  #     - DB_TYPE=postgresdb
+  #     - DB_POSTGRESDB_HOST=postgres_n8n
+  #     - DB_POSTGRESDB_PORT=5432
+  #     - DB_POSTGRESDB_DATABASE=n8n_workflows
+  #     - DB_POSTGRESDB_USER=${N8N_DB_USER}
+  #     - DB_POSTGRESDB_PASSWORD=${N8N_DB_PASSWORD}
+  #     - N8N_HOST=agents.forthought.cc
+  #     - N8N_PORT=5678
+  #     - N8N_PROTOCOL=https
+  #     - WEBHOOK_URL=https://agents.forthought.cc/
+  #     - N8N_EDITOR_BASE_URL=https://agents.forthought.cc/
+  #   volumes:
+  #     - n8n_data:/home/node/.n8n
+  #   depends_on: [postgres_n8n]
+  #   restart: unless-stopped
+  #   networks: [default, edge]
+
+  # postgres_n8n:
+  #   profiles: ["extras"]
+  #   image: postgres:13-alpine
+  #   container_name: postgres_n8n_container
+  #   ports:
+  #     - "127.0.0.1:5433:5432"
+  #   environment:
+  #     - POSTGRES_DB=n8n_workflows
+  #     - POSTGRES_USER=${N8N_DB_USER}
+  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+  #   volumes:
+  #     - postgres_n8n_data:/var/lib/postgresql/data
+  #   restart: unless-stopped
+  #   networks: [default]
+
+  # local-deep-research:
+  #   profiles: ["extras"]
+  #   image: localdeepresearch/local-deep-research:latest
+  #   container_name: local_deep_research_container
+  #   ports:
+  #     - "127.0.0.1:5000:5000"
+  #   environment:
+  #     - OPENAI_API_BASE=http://host.docker.internal:1234/v1
+  #     - LLM_PROVIDER=openai
+  #     - LLM_BASE_URL=http://host.docker.internal:1234/v1
+  #   volumes:
+  #     - ./data:/app/data
+  #     - ldr_auth_data:/root/.local/share/local-deep-research
+  #   restart: unless-stopped
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   networks: [default, edge]
+
+  # word-gpt-plus:
+  #   profiles: ["extras"]
+  #   image: kuingsmile/word-gpt-plus:latest
+  #   container_name: word_gpt_plus
+  #   ports:
+  #     - "127.0.0.1:3006:80"
+  #   restart: unless-stopped
+  #   networks: [edge]
+  #   labels:
+  #     - "com.centurylinklabs.watchtower.enable=false"
+
+  # ===========================================================================
+  # DORMANT (GPU) — Uncomment if running Docling locally with ROCm
+  # ===========================================================================
+
+  # docling-rocm:
+  #   profiles: ["core"]
+  #   image: forthought-docling-rocm
+  #   container_name: docling_rocm_container
+  #   devices:
+  #     - /dev/dxg:/dev/dxg
+  #   volumes:
+  #     - docling-rocm-cache:/root/.cache/docling
+  #     - ./data:/data
+  #     - /usr/lib/wsl/lib/libdxcore.so:/usr/lib/wsl/lib/libdxcore.so:ro
+  #   ports:
+  #     - "127.0.0.1:5002:5001"
+  #   environment:
+  #     - LD_LIBRARY_PATH=/usr/lib/wsl/lib:/opt/rocm/lib
+  #     - HSA_OVERRIDE_GFX_VERSION=11.0.0
+  #     - HIP_VISIBLE_DEVICES=0
+  #     - OMP_NUM_THREADS=8
+  #     - DOCLING_SERVE_ENABLE_UI=true
+  #     - DOCLING_SERVE_ENABLE_REMOTE_SERVICES=true
+  #     - DOCLING_SERVE_MAX_SYNC_WAIT=3600
+  #     - MIOPEN_FIND_MODE=FAST
+  #     - MIOPEN_USER_DB_PATH=/root/.cache/miopen
+  #     - MIOPEN_WORKSPACE_MAX=268435456
+  #     - PYTORCH_HIP_ALLOC_CONF=max_split_size_mb:512,expandable_segments:True
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: "8.0"
+  #         memory: 16G
+  #   cap_add: [SYS_PTRACE]
+  #   security_opt: ["seccomp:unconfined"]
+  #   ipc: host
+  #   restart: unless-stopped
+  #   networks: [default]
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "curl -sf http://127.0.0.1:5001/health || exit 1"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 10
+  #     start_period: 180s
+
+  # docling-proxy:
+  #   profiles: ["core"]
+  #   build:
+  #     context: .
+  #     dockerfile: dockerfiles/Dockerfile.docling-proxy
+  #   image: forthought-docling-proxy
+  #   container_name: docling_proxy
+  #   environment:
+  #     - DOCLING_URL=http://docling-rocm:5001
+  #   volumes:
+  #     - ./scripts/docling_vlm_proxy.py:/app/docling_vlm_proxy.py:ro
+  #   ports:
+  #     - "127.0.0.1:5003:5003"
+  #   depends_on:
+  #     - docling-rocm
+  #   restart: unless-stopped
+  #   networks: [default]
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5003/health', timeout=2)\""]
+  #     interval: 20s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 10s
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  default:
+    driver: bridge
+  edge:
+    driver: bridge
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  # --- Active ---
+  metamcp_pg:
+    external: true
+    name: unsloth-wsl-test_metamcp_pg
+  qdrant_data:
+    external: true
+    name: forthought_qdrant_data
+  metamcp_uv_cache:
+    name: metamcp_uv_cache
+  mcp_uv_cache:
+    name: forthought_mcp_uv_cache
+
+  # --- Dormant (keep definitions so data is preserved) ---
+  docling-cache:
+    external: true
+    name: unsloth-wsl-test_docling-cache
+  docling-rocm-cache:
+    name: forthought_docling_rocm_cache
+  n8n_data:
+    external: true
+    name: unsloth-wsl-test_n8n_data
+  postgres_n8n_data:
+    external: true
+    name: unsloth-wsl-test_postgres_n8n_data
+  ldr_auth_data:
+    external: true
+    name: unsloth-wsl-test_ldr_auth_data
+  stepifi_uploads:
+    name: forthought_stepifi_uploads
+  stepifi_redis_data:
+    name: forthought_stepifi_redis
