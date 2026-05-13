@@ -3,7 +3,7 @@ title: Image Re-Embed Injector (Passive)
 author: Marios Adamidis
 description: Injects uploaded image URLs into system context and post-processes model
              output to fix bare-UUID image references into working /api/v1/files paths.
-version: 1.0.0
+version: 1.4.0
 changelog: v1.4.0 - Added outlet() post-processing that rewrites bare-UUID image markdown
            into full /api/v1/files/{id}/content paths. This fixes re-embed for ALL models
            regardless of whether they follow the injection prompt. Belt-and-suspenders.

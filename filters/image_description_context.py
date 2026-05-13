@@ -1,7 +1,8 @@
 """
 title: Image→Text Context (Vision Inlet + Status, v1.4.1)
-author: inMorphis (original); Marios Adamidis / FORTHought Lab (adaptation)
-version: 1.0.0
+author: inMorphis (adapted by Marios Adamidis)
+author_url: https://openwebui.com/u/inMorphis
+version: 1.4.1
 required_open_webui_version: 0.6.4
 description: Extracts text from images using an OpenAI-compatible vision model, injects context (user + pinned system), and strips image_url parts every turn so text-only models never see multimodal content. Shows spec-correct status with optional debug traces.
 """

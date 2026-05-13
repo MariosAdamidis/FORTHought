@@ -239,7 +239,7 @@ run(tool="xrd.identify", args={
 ```
 # Step 1: Export processed data
 result = run(tool="xrd.export_origin", args={"file_id": "abc123"})
-# result contains "origin_csv": "https://files.forthought.cc/files/..."
+# result contains "origin_csv": "https://localhost:8084/files/..."
 
 # Step 2: Import into Origin project
 run(tool="spec.import_csv", args={

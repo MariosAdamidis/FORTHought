@@ -1,190 +1,138 @@
 <table>
   <tr>
     <td width="150" align="center">
-      <img src="assets/forthought-logo.png" alt="Project FORTHought Logo"/>
+      <img src="assets/forthought-logo.png" alt="FORTHought Logo"/>
     </td>
     <td>
-      <h1>Project FORTHought</h1>
-      <i>A locally-hosted AI research configuration for Physics and STEM laboratories.</i>
+      <h1>FORTHought</h1>
+      <i>A locally hosted AI platform for physics and STEM laboratory workflows.</i>
       <br/><br/>
       <a href="https://github.com/MariosAdamidis/FORTHought/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
       <a href="#"><img src="https://img.shields.io/badge/AMD-ROCm%20Ready-red.svg" alt="AMD ROCm Ready"></a>
       <a href="#"><img src="https://img.shields.io/badge/GPU-2×%20R9700%20%2B%207900%20XT-orange.svg" alt="AMD GPUs"></a>
-      <br/>
+      <a href="https://arxiv.org/abs/XXXX.XXXXX"><img src="https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg" alt="arXiv paper"></a>
     </td>
   </tr>
 </table>
 
+> **Paper:** M. Adamidis, D. Katrisioti, Y. Tzitzikas, E. Stratakis, *"It's not the Language Model, it's the Tool: Deterministic Mediation for Scientific Workflows"* — [arXiv:XXXX.XXXXX](https://arxiv.org/abs/XXXX.XXXXX) (2026). The paper evaluates how typed tool mediation produces identical scientific results across runs while code-generating approaches vary. The [OriginMCP](#originmcp--originlab-automation) and [SEM Micro](#sem-micro--electron-microscopy-fft-analysis) servers in this repository are the tools evaluated in the paper.
+
+---
+
 ## What This Is
 
-This repository documents my working configuration for a locally-hosted AI research platform, built around [Open WebUI](https://github.com/open-webui/open-webui), that I use daily in my Physics lab. It includes the custom tools, functions, optimizations, and MCP servers I've developed or assembled to support scientific workflows — literature review, spectroscopy, electron microscopy, X-ray diffraction, and data analysis.
+This repository contains the custom tools, MCP servers, functions, and configuration I built for a locally hosted AI research platform at a physics lab. It runs on [Open WebUI](https://github.com/open-webui/open-webui) and serves 15 active researchers across spectroscopy, electron microscopy, X-ray diffraction, photoluminescence, and general scientific workflows.
 
-**This is not a product.** It is a personal research setup that I maintain and iterate on. I upload my findings, configurations, and custom code here for documentation, reproducibility, and to share with my research group. The tools I build sit on top of existing open-source projects; my contribution is in how they are assembled, configured, and extended for real lab use.
+**This is not a product.** It is a working research platform that I maintain and iterate on. The tools sit on top of existing open-source projects; my contribution is in how they are assembled, configured, and extended for real lab use. I upload the code here for documentation, reproducibility, and to share with the community.
 
 **Hardware:**
 
 | Server | CPU | GPU | Role |
 |---|---|---|---|
-| **Compute Server** (new) | AMD Ryzen 9 9950X | 2× AMD Radeon AI Pro R9700 (32 GB VRAM each) | OriginLab, Lemonade reranker, embeddings, VLM, LM Studio, Docling |
-| **Docker Server** (existing) | Intel Xeon E5-2680 v4 | AMD Radeon RX 7900 XT (20 GB VRAM) | Open WebUI, MCP servers, Jupyter, Qdrant, MetaMCP, all Docker services |
+| **Compute Server** | AMD Ryzen 9 9950X | 2× AMD Radeon AI Pro R9700 (32 GB VRAM each) | OriginLab, Lemonade reranker, embeddings, VLM, LM Studio, Docling |
+| **Docker Server** | Intel Xeon E5-2680 v4 | AMD Radeon RX 7900 XT (20 GB VRAM) | Open WebUI, MCP servers, Jupyter, Qdrant, MetaMCP, all Docker services |
 
-The two machines communicate over Tailscale. The Docker server runs the full containerized stack, while the compute server handles GPU-intensive inference tasks (local LLMs, reranking, embeddings, document parsing).
+The two machines communicate over Tailscale. The Docker server runs the full containerized stack (35+ containers), while the compute server handles GPU-intensive inference tasks.
 
-> **Configuration note:** All service URLs default to `localhost`. To run your own instance, copy `config/.env.example` to `.env` and fill in your values. If you use Cloudflare Tunnels or a reverse proxy, update the relevant environment variables.
+> **Configuration note:** All service URLs default to `localhost`. To run your own instance, copy `config/.env.example` to `.env` and fill in your values.
 
 ---
 
 ## Base Stack
 
-The platform runs across two machines. The Docker server hosts the containerized stack, while the compute server handles GPU inference:
-
-- **LLM inference** via [LM Studio](https://lmstudio.ai/) (local models on the compute server's dual R9700s) and cloud APIs (Gemini via Google research grant, OpenRouter as fallback)
+- **LLM inference** via [LM Studio](https://lmstudio.ai/) (local models) and cloud APIs (Gemini via Google research grant, OpenRouter as fallback)
 - **Code execution** via a GPU-accelerated Jupyter kernel (ROCm, scientific Python stack)
 - **Document parsing** via [Docling](https://github.com/docling-project/docling) (native PyTorch ROCm, with Qwen3-VL for figure descriptions)
 - **Vector search** via [Qdrant](https://github.com/qdrant/qdrant) (hybrid BM25 + semantic)
-- **Tool orchestration** via [MetaMCP](https://github.com/nicepkg/MetaMCP), which aggregates all my MCP servers behind a single HTTP endpoint
+- **Tool orchestration** via [MetaMCP](https://github.com/nicepkg/MetaMCP), aggregating all MCP servers behind a single HTTP endpoint
 
-All services run on-premises. No data leaves the local network unless I explicitly use a cloud LLM.
+All services run on-premises. No data leaves the local network unless a cloud LLM is explicitly used.
 
 ---
 
-## What I've Configured and Built
+## What I've Built
 
-### RAG Pipeline Optimization
+### RAG Pipeline
 
-I tuned Open WebUI's RAG pipeline for scientific documents. Out-of-the-box defaults struggle with multi-column papers, equations, and dense tables. My current configuration:
+Tuned Open WebUI's RAG pipeline for scientific documents. Out-of-the-box defaults struggle with multi-column papers, equations, and dense tables.
 
 | Stage | Configuration | Notes |
 |---|---|---|
-| **Parsing** | Docling (ROCm GPU) | Native PyTorch ROCm with Granite-Docling instances; VLM image description via Qwen3-VL |
-| **Embeddings** | Qwen 0.6B embed via LM Studio | Served through a custom parallel proxy that splits OWUI's single-batch requests into concurrent sub-batches |
-| **Vector store** | Qdrant, hybrid search enabled | 800-token chunks, 100 overlap |
-| **Reranking** | BGE-reranker-v2-m3 (GGUF) on 🍋 AMD Lemonade Server | `/api/v1/reranking` endpoint, shared by RAG and web search |
-
-The 🍋 [AMD Lemonade](https://github.com/lemonade-sdk/lemonade) Server is the reranking backbone — it serves the model through an OpenAI-compatible API, so both Open WebUI's native RAG and my custom web search tool use the same endpoint.
+| **Parsing** | Docling (ROCm GPU) | Granite-Docling + Qwen3-VL for figure descriptions |
+| **Embeddings** | Qwen 0.6B embed via LM Studio | Served through a custom parallel proxy that splits batch requests into concurrent sub-batches |
+| **Vector store** | Qdrant, hybrid search | 800-token chunks, 100 overlap |
+| **Reranking** | BGE-reranker-v2-m3 (GGUF) on 🍋 AMD Lemonade | Shared by RAG and web search |
 
 ### Multi-Role Local Models on Lemonade
 
-A core design principle is making each locally-hosted model serve multiple roles across the stack. The compute server runs three models on the dual R9700 GPUs through AMD Lemonade, and each one pulls double (or triple) duty:
+Each locally hosted model serves multiple roles across the stack:
 
 | Model | Roles | Used by |
 |---|---|---|
 | **BGE-reranker-v2-m3** (GGUF) | RAG reranking, web search reranking | OWUI Documents pipeline, `web_search.py` tool |
-| **Qwen3-Embedding-0.6B** (GGUF) | Document embeddings | OWUI RAG pipeline (via parallel proxy on :5555) |
-| **Qwen3-VL-30B** (GGUF) | Image descriptions for Docling, vision model for SEM analysis, general-purpose VLM | Docling picture description, `image_description_context` filter, SEM MCP server, direct chat |
-
-The VLM in particular is planned for browser-use automation — using it to control instrument software (e.g., navigating a microscope GUI, clicking "capture image") for end-to-end experimental workflows.
+| **Qwen3-Embedding-0.6B** (GGUF) | Document embeddings | OWUI RAG pipeline (via parallel proxy) |
+| **Qwen3-VL-30B** (GGUF) | Image descriptions, SEM analysis, general VLM | Docling, `image_description_context` filter, SEM server |
 
 ### Free Web Search with Reranking
 
-I built a custom Open WebUI tool function that provides web-augmented answers without expensive search APIs:
+Custom tool that provides web-augmented answers without expensive search APIs:
 
 - Queries the [LangSearch](https://langsearch.com/) API (free tier, 1000 calls/day)
-- Passes all results through the same Lemonade reranker used by RAG
-- Filters by relevance score (>= 1.0 raw logit), Latin-script ratio, and content length
+- Passes results through the same Lemonade reranker used by RAG
+- Filters by relevance score, Latin-script ratio, and content length
 - Auto-fetches top-scoring pages for full context
 - Injects citations into OWUI's native citation UI
 
 See: [`tools/web_search.py`](tools/web_search.py)
 
-### Three Agent Profiles with Skill-Gated Routing
+### Skill-Gated Tool Routing
 
-Instead of one system prompt stuffed with every tool's documentation, I split my setup into three profiles, each with its own tool surface:
+Instead of one system prompt stuffed with every tool's documentation, the platform uses per-profile tool surfaces:
 
-| Profile | What I use it for | Tools it sees |
+| Profile | Use case | Tools it sees |
 |---|---|---|
-| **Lab** | Literature review, report writing, web research, chemistry lookups | `paper.*`, `file.*`, `web.*`, `chem.*`, `lib.*`, `slide.*`, Jupyter |
-| **Coder** | Data analysis, plotting, scripting, library documentation | Jupyter (ROCm), `file.*`, `lib.*` |
-| **Instrument** | Spectroscopy fitting, SEM analysis, XRD phase ID, PL modeling | `spec.*`, `micro.*`, `xrd.*`, `pl.*`, `file.*` |
+| **Lab** | Literature, reports, web research, chemistry | `paper.*`, `file.*`, `web.*`, `chem.*` |
+| **Coder** | Data analysis, plotting, scripting | Jupyter (ROCm), `file.*`, code tools |
+| **Instrument** | Spectroscopy, SEM, XRD, PL | `spec.*`, `micro.*`, `xrd.*`, `pl.*` |
 
-Each profile consists of three pieces:
-1. A **lean system prompt** ([`profiles/`](profiles/)) — contains only a routing table, no tool recipes
-2. A **Skills file** ([`skills/`](skills/)) — a Python OWUI Tool that acts as the MCP gateway with typed public methods and a registry-based dispatch
-3. **Skill documents** ([`skill-docs/`](skill-docs/)) — loaded on-demand via `view_skill(domain)` only when the LLM actually needs to call a tool
+Each profile consists of:
+1. A **lean system prompt** ([`profiles/`](profiles/)) — routing table only, no tool recipes
+2. A **skills file** ([`skills/`](skills/)) — Python OWUI Tool acting as MCP gateway
+3. **Skill documents** ([`skill-docs/`](skill-docs/)) — loaded on-demand only when the model actually needs a tool
 
-This keeps token usage low. The LLM never loads tool documentation it doesn't need for the current request.
-
-### MetaMCP Orchestration
-
-All tool servers connect through MetaMCP on a single port. Adding a new server is:
-
-1. Write the MCP server
-2. Add one entry to MetaMCP's config
-3. Restart MetaMCP
-4. Register the tool in the relevant Skills file
-5. Write a skill document
-
-This is how I've been able to add new scientific tools (XRD, PL, Chemistry) without disrupting the existing stack.
+This keeps token usage low. The model never loads documentation it doesn't need.
 
 ---
 
-## Science Tools
+## Science MCP Servers
 
-These are the MCP tool servers I've built or significantly customized for my lab's workflows. Each runs as a standalone Python HTTP server implementing the MCP JSON-RPC protocol.
-
----
+These are the MCP tool servers built for the lab's workflows. Each runs as a standalone Python HTTP server implementing the MCP JSON-RPC protocol.
 
 ### OriginMCP — OriginLab Automation
 
-**Server:** [`mcp-servers/origin/server.py`](mcp-servers/origin/server.py) (3300+ lines, 10 tools)
+**Server:** [`mcp-servers/origin/server.py`](mcp-servers/origin/server.py) (3300+ lines)
 
-Automates OriginPro through its COM API, allowing the LLM to inspect, analyze, and fit spectroscopy data from OPJ project files without manual GUI interaction.
+Automates OriginPro through its COM API, allowing the model to inspect, analyze, and fit spectroscopy data from OPJ project files. This is the photoluminescence tool evaluated in the [paper](https://arxiv.org/abs/XXXX.XXXXX).
 
-**What it does:**
-- Inspect OPJ file structure and column metadata (including user-defined parameters like strain, polarization)
-- Extract raw X/Y data from any workbook/sheet
-- Fit peaks: single (Lorentzian, Gaussian, Voigt) or two-peak decomposition across all lineshape combinations
-- Batch fit across N columns in one call with automatic summary grid, waterfall, and trend plots
+- Inspect OPJ file structure and column metadata (user-defined parameters: strain, polarization, power)
+- Fit peaks: single or two-peak decomposition across Lorentzian, Gaussian, Voigt lineshapes
+- Batch fit across N columns with automatic summary grid, waterfall, and trend plots
 - Detect degenerate fits (converging peaks) and flag them without crashing
 - Infer experimental parameters from column naming conventions when metadata is missing
 
-Runs natively on Windows (requires OriginPro installed). Accessible to the Docker stack via Tailscale.
-
----
-
-### Papers MCP — Literature Search
-
-**Server:** [`mcp-servers/papers/server.py`](mcp-servers/papers/server.py)
-
-Searches and retrieves academic papers from multiple sources in a single tool call.
-
-**What it does:**
-- Search OpenAlex (250M+ papers, full-text semantic search), PubMed, and Semantic Scholar
-- Author disambiguation via ORCID
-- Full-text PDF download with automatic source fallback (publisher, OA location, arXiv)
-- Batch operations for processing reference lists
-- Returns structured metadata the LLM uses directly for citations
-
----
-
-### XRD Server — X-Ray Diffraction Phase Identification
-
-**Server:** [`mcp-servers/xrd/server.py`](mcp-servers/xrd/server.py)
-
-A file-format-agnostic XRD analysis pipeline that identifies crystalline phases from raw diffraction data.
-
-**What it does:**
-- Parses `.xy`, `.dat`, `.csv`, `.brml` (Bruker XML), and `.raw` (Bruker RAW v4 binary) automatically
-- Matches peaks against the Crystallography Open Database (COD) and Materials Project
-- Reports confidence scores, Rwp R-factors, purity estimates, and impurity detection from precursor formulas
-- Generates annotated pattern and comparison plots inline
-- Exports Origin-ready CSVs (background-subtracted, with d-spacing and peak markers)
-- Chains into OriginMCP to produce a ready-to-use OPJ project file
-
----
+Runs on Windows (requires OriginPro). Accessible to the Docker stack via Tailscale.
 
 ### SEM Micro — Electron Microscopy FFT Analysis
 
 **Server:** [`mcp-servers/micro/server.py`](mcp-servers/micro/server.py)
 
-FFT-based periodicity and particle size analysis for SEM images.
+FFT-based periodicity and particle size analysis for SEM images. This is the scanning electron microscopy tool evaluated in the [paper](https://arxiv.org/abs/XXXX.XXXXX).
 
-**What it does:**
 - Reads magnification from the SEM info bar via VLM
-- Performs 2D FFT with radial averaging and peak detection
-- Reports periodicity (nm), orientation, confidence, and SNR for macro/micro spatial frequency bands
-- Particle size distribution (count, mean diameter, std dev, p10-p90) when requested
-- Outputs a 6-panel composite figure (FFT, power spectrum, line profiles, histogram)
+- 2D FFT with radial averaging and peak detection
+- Reports periodicity (nm), orientation, confidence, and SNR for macro/micro frequency bands
+- Particle size distribution (count, mean diameter, std dev, p10–p90)
+- 6-panel composite figure output
 
 <p align="center">
   <img src="assets/screenshots/SEM.png" alt="SEM FFT periodicity analysis" width="700"/>
@@ -192,24 +140,40 @@ FFT-based periodicity and particle size analysis for SEM images.
   <em>FFT periodicity analysis of a LIPSS nanostructure at ×40,000 — automatic magnification detection, 6-panel composite, and data export.</em>
 </p>
 
-> 📸 **More screenshots:** See the full **[Examples Gallery](docs/EXAMPLES.md)** for OriginMCP batch fitting, literature search, XRD phase ID, PL experiment planning, and more.
+### XRD Server — X-Ray Diffraction Phase Identification
 
----
+**Server:** [`mcp-servers/xrd/server.py`](mcp-servers/xrd/server.py)
+
+File-format-agnostic XRD analysis pipeline that identifies crystalline phases from raw diffraction data.
+
+- Parses `.xy`, `.dat`, `.csv`, `.brml` (Bruker XML), and `.raw` (Bruker RAW v4 binary)
+- Matches against the Crystallography Open Database (COD) and Materials Project
+- Reports confidence scores, Rwp R-factors, purity estimates, impurity detection
+- Generates annotated pattern and comparison plots inline
+- Exports Origin-ready CSVs
 
 ### PL Server — Photoluminescence Experiment Planning
 
 **Server:** [`mcp-servers/pl/server.py`](mcp-servers/pl/server.py)
 
-Laser/filter/optics recommender and Fresnel interference calculator for planning photoluminescence measurements, with specialized support for 2D materials.
+Laser/filter/optics recommender and Fresnel interference calculator for PL measurements, with specialized support for 2D materials.
 
-**What it does:**
 - Recommends laser wavelengths, filters, and optical components for any target material
-- Calculates excitation and emission field enhancement factors for air/SiO₂/Si substrate stacks
-- Models how PL, Raman, and SHG signal intensity varies with SiO₂ thickness
+- Calculates excitation and emission enhancement factors for air/SiO₂/Si stacks
+- Models signal intensity variation with SiO₂ thickness (PL, Raman, SHG)
 - Plans SHG/THG, strain analysis, PLE, imaging mode, and valley polarization experiments
-- Built-in materials database (TMDs, perovskites, III-V semiconductors, etc.)
+- Built-in materials database (TMDs, perovskites, III-V semiconductors)
 
----
+### Papers MCP — Literature Search
+
+**Server:** [`mcp-servers/papers/server.py`](mcp-servers/papers/server.py)
+
+Searches and retrieves academic papers from multiple open-access sources.
+
+- Search OpenAlex (250M+ papers, semantic search), PubMed, Semantic Scholar, NASA ADS, CrossRef, OpenAIRE
+- Author disambiguation via ORCID
+- PDF download from open-access sources (arXiv, OpenAlex, Unpaywall, PMC)
+- Batch operations for reference lists
 
 ### Files MCP — Document Generation
 
@@ -217,18 +181,20 @@ Laser/filter/optics recommender and Fresnel interference calculator for planning
 
 Generates DOCX, PPTX, XLSX, PDF, CSV, HTML, and plain text files from structured data, with default templates.
 
+> 📸 **Screenshots:** See the **[Examples Gallery](docs/EXAMPLES.md)** for OriginMCP batch fitting, literature search, XRD phase ID, PL experiment planning, and more.
+
 ---
 
 ## Custom Open WebUI Functions
-
-Beyond MCP tools, I use several custom OWUI functions uploaded directly into the platform:
 
 ### Pipes
 
 | Function | What it does |
 |---|---|
 | [`gemini_pipe.py`](pipes/gemini_pipe.py) | Google Gemini pipeline with native tool support and image generation |
-| [`openrouter_pipe_v2.py`](pipes/openrouter_pipe_v2.py) | OpenRouter Responses API integration with web search and file upload support |
+| [`openrouter_pipe_v2.py`](pipes/openrouter_pipe_v2.py) | OpenRouter Responses API integration with web search and file uploads |
+
+> **Note:** The pipe files here are reference snapshots. The production pipes have evolved significantly with event-driven streaming, tool-call UI panels, and provider-specific optimizations.
 
 ### Filters
 
@@ -244,7 +210,7 @@ Beyond MCP tools, I use several custom OWUI functions uploaded directly into the
 | Function | What it does |
 |---|---|
 | [`web_search.py`](tools/web_search.py) | Free web search with LangSearch API + Lemonade reranking |
-| [`chemistry_database.py`](tools/chemistry_database.py) | PubChem and CAS compound lookups (name, formula, CAS number, safety data) |
+| [`chemistry_database.py`](tools/chemistry_database.py) | PubChem and CAS compound lookups (name, formula, safety data) |
 | [`chart_server/`](tools/chart_server/) | Server-side Chart.js rendering for inline data visualizations |
 | [`presenton_adapter.py`](tools/presenton_adapter.py) | MCP bridge to Presenton for AI-generated slide decks |
 
@@ -257,60 +223,36 @@ Beyond MCP tools, I use several custom OWUI functions uploaded directly into the
 
 ---
 
-## Infrastructure Notes
-
-### Reranker Configuration (Open WebUI Admin → Documents)
+## Architecture
 
 ```
-Reranking Engine: external
-External Reranker URL: http://<host-ip>:8040/api/v1/reranking
-Reranking Model: bge-reranker-v2-m3-GGUF
-```
-
-### Key Docker Environment Variables
-
-See [`config/.env.example`](config/.env.example) for the full list. Key ones:
-
-```yaml
-- VECTOR_DB=qdrant
-- QDRANT_URI=http://qdrant:6333
-- RAG_EMBEDDING_ENGINE=openai
-- RAG_EMBEDDING_MODEL=embed
-- ENABLE_RAG_HYBRID_SEARCH=True
-- CODE_EXECUTION_ENGINE=jupyter
-- CODE_EXECUTION_JUPYTER_URL=http://unsloth-jupyter:8888
-```
-
-### Architecture Overview
-
-```
-┌─── Docker Server (Xeon E5-2680v4 + RX 7900 XT) ───────────┐
-│                                                              │
-│  Open WebUI (:8081)                                          │
-│      │                                                       │
-│      ├── Gemini Pipeline (primary LLM, research grant)       │
-│      ├── OpenRouter Pipe (fallback models)                   │
-│      │                                                       │
-│      ├── Qdrant (:6333) ── hybrid vector search              │
-│      ├── Jupyter (:8888) ── code execution (ROCm)            │
-│      │                                                       │
-│      └── MetaMCP (:12008)                                    │
-│          ├── Papers    (:9005)   ├── Chemistry (OWUI tool)   │
-│          ├── Files     (:9004)   ├── XRD       (:9008)       │
-│          ├── SEM/Micro (:9006)   ├── PL        (:9010)       │
-│          └── Context7, Presenton, Browser                    │
-│                                                              │
-└──────────────── Tailscale ──────────────────────────────────┘
+┌─── Docker Server (Xeon E5-2680v4 + RX 7900 XT) ────────────┐
+│                                                               │
+│  Open WebUI (:8081)                                           │
+│      │                                                        │
+│      ├── Gemini Pipeline (primary LLM)                        │
+│      ├── OpenRouter Pipe (fallback models)                    │
+│      │                                                        │
+│      ├── Qdrant (:6333) ── hybrid vector search               │
+│      ├── Jupyter (:8888) ── code execution (ROCm)             │
+│      │                                                        │
+│      └── MetaMCP (:12008)                                     │
+│          ├── Papers    (:9005)   ├── Chemistry (OWUI tool)    │
+│          ├── Files     (:9004)   ├── XRD       (:9008)        │
+│          ├── SEM/Micro (:9006)   ├── PL        (:9010)        │
+│          └── Context7, Presenton, Browser                     │
+│                                                               │
+└──────────────── Tailscale ───────────────────────────────────┘
                       │
-┌─── Compute Server (Ryzen 9950X + 2× R9700 64 GB) ──────────┐
-│                                                              │
-│  LM Studio (:1234) ── local LLMs, VLM (Qwen3-VL)            │
-│  Lemonade Server (:8040) ── BGE-reranker-v2-m3-GGUF          │
-│  Embedding Proxy (:5555) ── Qwen 0.6B embed                  │
-│  Docling (:5001-5003) ── document parsing (ROCm)             │
-│  OriginMCP (:12009) ── OriginLab COM automation (Windows)    │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
+┌─── Compute Server (Ryzen 9950X + 2× R9700 64 GB) ───────────┐
+│                                                               │
+│  LM Studio (:1234) ── local LLMs, VLM (Qwen3-VL)             │
+│  Lemonade Server (:8040) ── BGE-reranker-v2-m3-GGUF           │
+│  Embedding Proxy (:5555) ── Qwen 0.6B embed                   │
+│  Docling (:5001-5003) ── document parsing (ROCm)              │
+│  OriginMCP (:12009) ── OriginLab COM automation (Windows)     │
+│                                                               │
+└───────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -320,6 +262,8 @@ See [`config/.env.example`](config/.env.example) for the full list. Key ones:
 ```
 FORTHought/
 ├── README.md
+├── CITATION.cff
+├── LICENSE
 ├── .gitignore
 │
 ├── mcp-servers/                     # MCP tool servers
@@ -330,30 +274,30 @@ FORTHought/
 │   ├── pl/server.py                 #   PL experiment planning
 │   └── files/                       #   Document generation (DOCX, PPTX, etc.)
 │
-├── pipes/                           # LLM provider integrations
+├── pipes/                           # LLM provider integrations (reference snapshots)
 │   ├── gemini_pipe.py               #   Google Gemini pipeline
 │   └── openrouter_pipe_v2.py        #   OpenRouter Responses API
 │
 ├── filters/                         # Input/output processing
-│   ├── markdown_normalizer.py       #   Fix LLM formatting issues
-│   ├── image_description_context.py #   Vision-to-text for non-vision models
-│   ├── image_reembed_injector.py    #   Re-inject image URLs across turns
-│   └── uploaded_filename.py         #   File metadata injection for tools
+│   ├── markdown_normalizer.py
+│   ├── image_description_context.py
+│   ├── image_reembed_injector.py
+│   └── uploaded_filename.py
 │
 ├── tools/                           # OWUI tool functions
-│   ├── web_search.py                #   Free web search + reranking
-│   ├── chemistry_database.py        #   PubChem/CAS compound lookups
-│   ├── chart_server/                #   Chart.js rendering service
-│   └── presenton_adapter.py         #   AI slide deck generation
+│   ├── web_search.py
+│   ├── chemistry_database.py
+│   ├── chart_server/
+│   └── presenton_adapter.py
 │
 ├── actions/                         # Chat action buttons
-│   ├── export_to_word.py            #   Conversation → Word doc
-│   └── lemonade_control_panel.py    #   Lemonade server dashboard
+│   ├── export_to_word.py
+│   └── lemonade_control_panel.py
 │
 ├── skills/                          # MCP gateway + routing logic
-│   ├── lab_skills.py                #   Lab profile tools
-│   ├── coder_skills.py              #   Coder profile tools
-│   └── instrument_skills.py         #   Instrument profile tools
+│   ├── lab_skills.py
+│   ├── coder_skills.py
+│   └── instrument_skills.py
 │
 ├── skill-docs/                      # On-demand tool documentation
 │   ├── instruments/{origin,sem,xrd}/
@@ -362,62 +306,64 @@ FORTHought/
 │   ├── compute/code-interpreter/
 │   └── visualization/chartjs/
 │
-├── profiles/                        # System prompts (lean routing tables)
+├── profiles/                        # System prompt templates
 │   ├── lab_prompt.md
 │   ├── coder_prompt.md
 │   └── instrument_prompt.md
 │
 ├── config/
-│   ├── docker-compose.yml           # Full stack deployment
-│   ├── .env.example                 # All required environment variables
-│   ├── Dockerfile.jupyter           # GPU Jupyter kernel (ROCm)
-│   ├── Dockerfile.fileserver        # Authenticated file server
-│   └── Dockerfile.metamcp           # MetaMCP container
+│   ├── docker-compose.yml
+│   ├── .env.example
+│   └── Dockerfile.*
 │
 ├── docs/
-│   ├── SETUP.md                     # Complete OWUI configuration guide
-│   └── EXAMPLES.md                  # Screenshots gallery
+│   ├── SETUP.md
+│   └── EXAMPLES.md
 │
 ├── scripts/
-│   ├── fileserver_app.py            # File server application
-│   └── smoke_test_core.sh           # Service health checks
+│   ├── fileserver_app.py
+│   └── smoke_test_core.sh
 │
 └── assets/
-    └── forthought-logo.png
+    ├── forthought-logo.png
+    └── screenshots/
 ```
 
 ---
 
 ## Getting Started
 
-1. **Clone the repository:**
+1. **Clone:**
    ```bash
    git clone https://github.com/MariosAdamidis/FORTHought.git
    cd FORTHought
    ```
 
-2. **Configure environment:**
+2. **Configure:**
    ```bash
    cp config/.env.example .env
-   # Edit .env with your API keys and passwords
+   # Edit .env with your API keys and service URLs
    ```
 
-3. **Start the stack:**
+3. **Start:**
    ```bash
    docker compose -f config/docker-compose.yml up -d
    ```
 
-4. **Follow the setup guide:** See **[docs/SETUP.md](docs/SETUP.md)** for the complete walkthrough — importing functions, creating model profiles, configuring RAG, code execution, and MetaMCP wiring.
+4. **Set up Open WebUI:** See **[docs/SETUP.md](docs/SETUP.md)** for importing functions, creating model profiles, configuring RAG, code execution, and MetaMCP wiring.
 
-5. **Verify:** Run `bash scripts/smoke_test_core.sh` to check all services are healthy.
+5. **Verify:**
+   ```bash
+   bash scripts/smoke_test_core.sh
+   ```
 
 ---
 
 ## Roadmap
 
 ### Done
-- [x] HTTP-persistent MCP transport (eliminated cold starts)
-- [x] Three agent profiles with skill-gated routing
+- [x] HTTP-persistent MCP transport
+- [x] Skill-gated multi-profile routing
 - [x] OriginMCP: batch fitting, waterfall/trend plots, degenerate fit detection
 - [x] XRD pipeline with COD/MP matching and Origin export
 - [x] PL substrate enhancement and experiment planning server
@@ -425,13 +371,15 @@ FORTHought/
 - [x] AMD Lemonade reranker (dual: RAG + web search)
 - [x] Free web search tool with reranking
 - [x] Parallel embedding proxy
-- [x] Docling GPU acceleration on ROCm
-- [x] Docling VLM integration (Qwen3-VL for figure descriptions during ingestion)
+- [x] Docling GPU acceleration on ROCm with Qwen3-VL
 - [x] Markdown normalizer for output cleanup
+- [x] Typed mediation pattern evaluated across 4 platforms ([paper](https://arxiv.org/abs/XXXX.XXXXX))
+- [x] Open WebUI 0.9.5 with custom patches
+- [x] Event-driven tool-call UI panels in production pipes
 
 ### Next
-- [ ] Browser-use VLM automation for instrument control (microscope GUI navigation, image capture)
-- [ ] User-facing documentation
+- [ ] Additional OWUI tools to be open-sourced (interactive question UI, inline visuals, computer use)
+- [ ] Browser-use VLM automation for instrument control
 - [ ] N-peak fitting (defect emission, phonon replicas)
 - [ ] Raman peak database
 - [ ] PLE contour plots
@@ -439,15 +387,23 @@ FORTHought/
 
 ---
 
+## Security
+
+This platform is designed for local/private-network deployment. Do not expose services directly to the public internet. See [SECURITY.md](SECURITY.md) for details.
+
+The papers server in this repository is configured for open-access sources only. If you need institutional access, configure that through your own environment and credentials.
+
+---
+
 ## Acknowledgements
 
-This setup is built on top of open-source projects and community contributions I'm grateful for.
+Built on top of open-source projects and community contributions.
 
 ### Core Platform
 
-- [Open WebUI](https://github.com/open-webui/open-webui) — The chat interface everything runs through
+- [Open WebUI](https://github.com/open-webui/open-webui) — Chat interface
 - [AMD Lemonade](https://github.com/lemonade-sdk/lemonade) — Local reranker serving on AMD hardware
-- [Docling](https://github.com/docling-project/docling) — Document parsing for the RAG pipeline
+- [Docling](https://github.com/docling-project/docling) — Document parsing
 - [Qdrant](https://github.com/qdrant/qdrant) — Vector database
 - [LM Studio](https://lmstudio.ai/) — Local model serving
 - [MetaMCP](https://github.com/nicepkg/MetaMCP) — MCP server orchestration
@@ -462,17 +418,34 @@ Several Open WebUI functions in this repository are adapted from community work.
 | Function | Original Author | What I adapted |
 |---|---|---|
 | Gemini Pipeline | [owndev](https://openwebui.com/u/owndev), [olivier-lacroix](https://openwebui.com/u/olivier-lacroix) | Token optimization, tool integration, image generation |
-| OpenRouter Pipe | [rbb-dev](https://openwebui.com/u/rbb-dev) | Integration with our MetaMCP and file server |
+| OpenRouter Pipe | [rbb-dev](https://openwebui.com/u/rbb-dev) | Integration with MetaMCP and file server |
 | Export to Word | [Fu-Jie](https://openwebui.com/u/Fu-Jie) | APA 7th Edition styling, Greek/English i18n |
 | Markdown Normalizer | [Fu-Jie](https://openwebui.com/u/Fu-Jie) | Custom rules for scientific output cleanup |
-| Image Description Context | [inMorphis](https://openwebui.com/u/inMorphis) | Adapted for our multi-model routing |
-| Files Metadata Injector | [GlissemanTV](https://openwebui.com/u/GlissemanTV) | Integration with our file server pipeline |
-| Lemonade Control Panel | [Sawan Srivastava](https://openwebui.com/u/sawan-srivastava) | Integrated into our Lemonade deployment |
+| Image Description Context | [inMorphis](https://openwebui.com/u/inMorphis) | Adapted for multi-model routing |
+| Files Metadata Injector | [GlissemanTV](https://openwebui.com/u/GlissemanTV) | Integration with file server pipeline |
+| Lemonade Control Panel | [Sawan Srivastava](https://openwebui.com/u/sawan-srivastava) | Integrated into Lemonade deployment |
 
 ### Community Contributors
 
 - **r/LocalLLaMA** contributor **Ok_Ocelot2268** — ROCm patches for Unsloth
 - **@mballesterosc** (Open WebUI community) — File Path Injector concept
+
+---
+
+## Citation
+
+If you use ideas or code from FORTHought, please cite:
+
+```bibtex
+@misc{adamidis2026forthought,
+  author = {Adamidis, Marios and Katrisioti, Danae and Tzitzikas, Yannis and Stratakis, Emmanuel},
+  title  = {It's not the Language Model, it's the Tool: Deterministic Mediation for Scientific Workflows},
+  year   = {2026},
+  eprint = {XXXX.XXXXX},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.AI}
+}
+```
 
 ---
 

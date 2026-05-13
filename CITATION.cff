@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+message: "If you use ideas or code from FORTHought, please cite the accompanying paper."
+title: "FORTHought"
+authors:
+  - family-names: "Adamidis"
+    given-names: "Marios"
+    orcid: "https://orcid.org/0000-0000-0000-0000"
+  - family-names: "Katrisioti"
+    given-names: "Danae"
+  - family-names: "Tzitzikas"
+    given-names: "Yannis"
+  - family-names: "Stratakis"
+    given-names: "Emmanuel"
+date-released: "2026-05-13"
+license: "MIT"
+repository-code: "https://github.com/MariosAdamidis/FORTHought"
+abstract: "A locally hosted AI platform for physics and STEM laboratory workflows, featuring typed tool mediation for reproducible scientific analysis."
+preferred-citation:
+  type: article
+  authors:
+    - family-names: "Adamidis"
+      given-names: "Marios"
+    - family-names: "Katrisioti"
+      given-names: "Danae"
+    - family-names: "Tzitzikas"
+      given-names: "Yannis"
+    - family-names: "Stratakis"
+      given-names: "Emmanuel"
+  title: "It's not the Language Model, it's the Tool: Deterministic Mediation for Scientific Workflows"
+  year: 2026
+  journal: "arXiv preprint"
+  doi: "XXXX.XXXXX"

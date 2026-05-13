@@ -257,7 +257,7 @@ origin.smooth (noisy data) → origin.normalize (comparing) → origin.find_peak
 **DO THIS:**
 ```
 # In the tool response JSON, the first key is:
-"embed_markdown": "![Waterfall Plot](https://webui.forthought.cc/api/v1/files/abc-123/content)\n![Peak Position Trend](https://webui.forthought.cc/api/v1/files/def-456/content)"
+"embed_markdown": "![Waterfall Plot](https://localhost:8081/api/v1/files/abc-123/content)\n![Peak Position Trend](https://localhost:8081/api/v1/files/def-456/content)"
 
 # Copy these lines directly into your response text.
 ```

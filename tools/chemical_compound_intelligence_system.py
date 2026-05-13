@@ -1,7 +1,8 @@
 """
 title: Chemical Compound Intelligence System (OpenRouter)
-author: Marios Adamidis (FORTHought Lab)
-version: 1.0.0
+author: calandock (original), Marios Adamidis (extended with OpenRouter + safety data)
+author_url: https://openwebui.com/u/calandock
+version: 3.2
 description: |
     Comprehensive search for chemical compounds in PubChem and CAS Common Chemistry.
     Uses OpenRouter (OpenAI-compatible) for name translation to English.

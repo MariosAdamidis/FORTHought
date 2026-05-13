@@ -60,7 +60,7 @@ Tell the user about the pool: "Found 187 unique papers across 8 sources, showing
 
 ### download_papers() — Get PDFs
 Pass a list of paper dicts with `arxiv_id` or `doi`. Prefer `arxiv_id` (fastest).
-Download cascade: arXiv → OpenAlex Content → Unpaywall → Elsevier API → Publisher Direct → PMC → Sci-Hub
+Download cascade: arXiv → OpenAlex Content → Unpaywall → Elsevier API → Publisher Direct → PMC
 
 ### run("papers.details", {"arxiv_id": ...}) — Get Abstracts
 Only call after search. Pass arxiv_id or doi from search results.

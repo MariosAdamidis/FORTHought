@@ -1,9 +1,12 @@
 """
-title: FORTHought Lab Skills
-description: Tool gateway for lab model profiles. Academic paper search (8 sources with author ID resolution) and download,
-    document creation and editing, presentations, and web fetch. Attach Web Search,
-    Jupyter Code Tool, and Chemistry DB separately in model settings.
-author: Marios Adamidis (FORTHought Lab)
+title: FORTHought Research Tools
+description: Universal research gateway for academic paper search, download,
+    citation resolution, and web content fetching.
+    Papers: 8 sources (arXiv, OpenAlex, NASA ADS, Semantic Scholar, PubMed,
+    DBLP, CrossRef, Google Scholar) with author ID resolution and batch ops.
+    Web: URL content extraction with safety filtering.
+    Every model gets this tool.
+author: Marios Adamidis
 version: 1.0.0
 required_open_webui_version: 0.6.6
 """
@@ -23,7 +26,7 @@ except ImportError:
 
 from pydantic import BaseModel, Field
 
-log = logging.getLogger("forthought.skills.lab")
+log = logging.getLogger("forthought.tools.research")
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  MCP Streamable-HTTP micro-client  (shared singleton)
@@ -62,7 +65,7 @@ class _MCPClient:
                 "params": {
                     "protocolVersion": _PROTOCOL_VERSION,
                     "capabilities": {},
-                    "clientInfo": {"name": "forthought-skills", "version": "1.0.0"},
+                    "clientInfo": {"name": "forthought-research", "version": "1.0.0"},
                 },
             },
             headers=headers,
@@ -246,7 +249,7 @@ _BLOCKED_NETS = [
         "fe80::/10",
     ]
 ]
-_ALLOWED_INTERNAL = set(os.getenv("ALLOWED_INTERNAL_IPS", "").split(",")) if os.getenv("ALLOWED_INTERNAL_IPS") else set()
+_ALLOWED_INTERNAL = {"127.0.0.1"}  # Set to your internal IP
 
 
 def _is_url_safe(url: str) -> bool:
@@ -266,14 +269,15 @@ def _is_url_safe(url: str) -> bool:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  Registry — Lab profile: papers, files, presenton
+#  Registry — Research profile: papers
+#  (identical to lab_skills registry — NO instrument servers)
 # ═══════════════════════════════════════════════════════════════════════════
 
 
 def _build_registry(valves: Any) -> Dict[str, dict]:
     t = valves.default_timeout
     return {
-        # -- papers --
+        # -- papers (academic search, download, resolution) --
         "papers.search": {
             "url": valves.papers_url,
             "mcp": "search",
@@ -314,54 +318,7 @@ def _build_registry(valves: Any) -> Dict[str, dict]:
             "mcp": "book_download",
             "timeout": valves.papers_timeout,
         },
-        # -- files --
-        "doc.create": {
-            "url": valves.files_url,
-            "mcp": "create_file",
-            "timeout": t,
-            "auth": "files",
-        },
-        "doc.read": {
-            "url": valves.files_url,
-            "mcp": "full_context_document",
-            "timeout": t,
-            "auth": "files",
-        },
-        "doc.edit": {
-            "url": valves.files_url,
-            "mcp": "edit_document",
-            "timeout": t,
-            "auth": "files",
-        },
-        "doc.review": {
-            "url": valves.files_url,
-            "mcp": "review_document",
-            "timeout": t,
-            "auth": "files",
-        },
-        "doc.archive": {
-            "url": valves.files_url,
-            "mcp": "generate_and_archive",
-            "timeout": t,
-            "auth": "files",
-        },
-        # -- presenton --
-        "pptx.generate": {
-            "url": valves.presenton_url,
-            "mcp": "generate_presentation",
-            "timeout": t,
-        },
-        "pptx.templates": {
-            "url": valves.presenton_url,
-            "mcp": "templates_list",
-            "timeout": t,
-        },
     }
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-#  Helpers (module-level -- invisible to OWUI)
-# ═══════════════════════════════════════════════════════════════════════════
 
 
 async def _emit(emitter: Optional[Any], msg: str, done: bool = False) -> None:
@@ -374,21 +331,83 @@ async def _emit(emitter: Optional[Any], msg: str, done: bool = False) -> None:
             pass
 
 
-def _get_user_token(user: Optional[dict] = None) -> Optional[str]:
-    return user.get("token") if user else None
+def _normalize_paper_arg(p: Any) -> Optional[Dict[str, str]]:
+    """Phase 2.12: coerce ANY 'paper' arg shape into a {doi?, arxiv_id?} dict.
+
+    Gemini sends download_papers args in many shapes depending on how it
+    parsed the search_papers result text:
+      - dict with 'doi' / 'arxiv_id' / 'id' (the canonical case)
+      - raw DOI string ('10.1038/...', '10.5281/zenodo.18418625')
+      - raw arXiv ID string ('2301.12345', '2301.12345v2')
+      - 'arxiv:2301.12345' or 'doi:10.1038/...' prefixed strings
+      - JSON-stringified dict ('{"doi": "10.1038/..."}')
+      - Full paper objects from search results (with title/authors/etc; we
+        extract just the identifiers)
+    Returns dict ready for the MCP papers server, or None if unparseable.
+    """
+    if isinstance(p, dict):
+        out: Dict[str, str] = {}
+        if p.get("doi"):
+            out["doi"] = str(p["doi"]).strip()
+        if p.get("arxiv_id"):
+            out["arxiv_id"] = str(p["arxiv_id"]).strip()
+        if p.get("arxivId"):  # camelCase variant from some sources
+            out["arxiv_id"] = str(p["arxivId"]).strip()
+        if not out and p.get("id"):
+            id_val = str(p["id"]).strip()
+            if id_val.startswith("10.") or "doi.org/" in id_val:
+                out["doi"] = id_val.split("doi.org/", 1)[-1].strip()
+            elif re.match(r"^\d{4}\.\d+(v\d+)?$", id_val):
+                out["arxiv_id"] = id_val
+        return out if out else None
+    if isinstance(p, str):
+        s = p.strip()
+        if not s:
+            return None
+        # JSON-stringified dict?
+        if s.startswith("{") and s.endswith("}"):
+            try:
+                parsed = json.loads(s)
+                if isinstance(parsed, dict):
+                    return _normalize_paper_arg(parsed)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        # Prefixed forms
+        low = s.lower()
+        if low.startswith("arxiv:"):
+            return {"arxiv_id": s.split(":", 1)[1].strip()}
+        if low.startswith("doi:"):
+            return {"doi": s.split(":", 1)[1].strip()}
+        if "doi.org/" in s:
+            return {"doi": s.split("doi.org/", 1)[1].strip()}
+        # arXiv ID pattern: 4-digit YYMM . sequence (optional version)
+        if re.match(r"^\d{4}\.\d+(v\d+)?$", s):
+            return {"arxiv_id": s}
+        # DOI: starts with "10."
+        if s.startswith("10."):
+            return {"doi": s}
+        # Last fallback: treat as DOI (most common from search results)
+        return {"doi": s}
+    return None
+
+
+def _mint_user_jwt(user: Optional[dict] = None) -> Optional[str]:
+    if not user or not user.get("id"):
+        return None
+    try:
+        from open_webui.utils.auth import create_token
+
+        return create_token(data={"id": user["id"]})
+    except Exception:
+        return None
 
 
 def _auth_for(valves: Any, entry: dict, user: Optional[dict] = None) -> Optional[str]:
-    if entry.get("auth") == "files":
-        return _get_user_token(user) or valves.files_admin_token or None
+    # research_tools has no auth-gated backends (papers server is open)
     return None
 
 
 def _json_safe(result: str) -> str:
-    """Ensure result is valid JSON for OWUI citation parser compatibility.
-    The OR pipe's get_citation_source_from_tool_result does json.loads()
-    on every tool return. Non-JSON strings crash it and dump raw text to chat.
-    """
     try:
         json.loads(result)
         return result
@@ -399,13 +418,6 @@ def _json_safe(result: str) -> str:
 async def _call_mcp(
     valves, url, tool_name, args, timeout, auth=None, max_chars: int = 8000
 ) -> str:
-    """Call an MCP tool and return JSON-safe result, truncated if needed.
-
-    Args:
-        max_chars: Maximum response length. If exceeded, returns a clean
-                   truncation JSON instead of raw-chopping the response.
-                   Default 8000. Paper detail tools should use 4000.
-    """
     try:
         result = await _mcp.call(
             url,
@@ -416,7 +428,6 @@ async def _call_mcp(
             retries=valves.max_retries,
         )
         result = _json_safe(result)
-        # Truncation safety net — prevent oversized responses from blowing context
         if len(result) > max_chars:
             try:
                 parsed = json.loads(result)
@@ -453,16 +464,7 @@ async def _call_mcp(
 class Tools:
     class Valves(BaseModel):
         papers_url: str = Field(
-            default="http://mcp-papers:9005/mcp", description="Papers MCP server"
-        )
-        files_url: str = Field(
-            default="http://mcp-files:9004/mcp", description="Files MCP server"
-        )
-        presenton_url: str = Field(
-            default="http://presenton:80/mcp", description="Presenton PPTX MCP server"
-        )
-        files_admin_token: str = Field(
-            default="", description="Fallback JWT for files server"
+            default="http://localhost:9005/mcp", description="Papers MCP server"
         )
         default_timeout: int = Field(default=120)
         papers_timeout: int = Field(default=180)
@@ -489,7 +491,7 @@ class Tools:
     ) -> str:
         """
         Execute any backend tool by name. Use find() to discover available tools and their parameters.
-        :param tool: Tool name (e.g. "papers.search", "doc.create", "pptx.generate"). Use find() to list them.
+        :param tool: Tool name (e.g. "papers.search", "papers.download", "papers.resolve"). Use find() to list them.
         :param args: Arguments dict matching the tool's parameters.
         """
         if not tool:
@@ -524,7 +526,6 @@ class Tools:
             )
         entry = registry[tool]
         await _emit(__event_emitter__, f"⚙️ {tool}...")
-        # Tight cap for large-payload paper tools
         _TIGHT = {"batch_details", "details", "books", "book_download"}
         cap = 4000 if entry["mcp"] in _TIGHT else 8000
         result = await _call_mcp(
@@ -550,36 +551,20 @@ class Tools:
     ) -> str:
         """
         Discover available tools. Returns names, parameters, descriptions.
-        :param query: Filter by keyword (e.g. "paper", "docx", "pptx"). Leave empty for all.
-        :param server: Filter by server -- papers, files, pptx. Leave empty for all.
+        :param query: Filter by keyword (e.g. "paper", "search", "download"). Leave empty for all.
+        :param server: Filter by server -- papers. Leave empty for all.
         """
         await _emit(__event_emitter__, "🔎 Discovering tools...")
         registry = _build_registry(self.valves)
         _SA = {
-            "files": "doc.",
-            "file": "doc.",
-            "document": "doc.",
-            "docs": "doc.",
+            "papers": "papers.",
             "paper": "papers.",
             "lit": "papers.",
+            "literature": "papers.",
             "academic": "papers.",
-            "presentation": "pptx.",
-            "slide": "pptx.",
-            "presenton": "pptx.",
+            "research": "papers.",
         }
         _KA = {
-            "edit": "doc.edit",
-            "replace": "doc.edit",
-            "modify": "doc.edit",
-            "read": "doc.read",
-            "create": "doc.create",
-            "write": "doc.create",
-            "review": "doc.review",
-            "archive": "doc.archive",
-            "document": "doc.",
-            "docx": "doc.",
-            "xlsx": "doc.",
-            "pdf": "doc.",
             "paper": "papers.",
             "literature": "papers.",
             "arxiv": "papers.",
@@ -592,10 +577,7 @@ class Tools:
             "doi": "papers.resolve",
             "book": "papers.books",
             "textbook": "papers.books",
-            "presentation": "pptx.",
-            "pptx": "pptx.",
-            "slides": "pptx.",
-            "generate": "pptx.generate",
+            "batch": "papers.batch",
         }
         servers: Dict[str, List[str]] = {}
         for name, entry in registry.items():
@@ -705,7 +687,7 @@ class Tools:
         :param year_max: Only papers published on or before this year.
         :param sort: Ranking — "relevance" (default), "date" (newest first), "citations".
         :param mode: Strategy — "auto" (default), "semantic" (AI embeddings), "keyword" (boolean/exact).
-        :param author: Author name to filter by (e.g. "Emmanuel Stratakis"). Uses ID-based resolution for exhaustive coverage. For comprehensive author results, use max_results=50.
+        :param author: Author name to filter by (e.g. "John Smith"). Uses ID-based resolution for exhaustive coverage. For comprehensive author results, use max_results=50.
         """
         if not query and not author:
             return json.dumps({"error": "Provide at least 'query' or 'author'."})
@@ -742,42 +724,71 @@ class Tools:
         **kwargs,
     ) -> str:
         """
-        Download paper PDFs. Any number of papers supported — auto-batched and zipped.
-        Tries arXiv, Unpaywall, then direct publisher.
-        :param papers: List of dicts with "doi" and/or "arxiv_id". Example: [{"doi": "10.1038/..."}, {"arxiv_id": "2301.12345"}]
+        Download paper PDFs by DOI or arXiv ID. Any number of papers supported — auto-batched and zipped.
+        Tries arXiv → Unpaywall → direct publisher.
+
+        :param papers: A list of papers to download. Each entry may be ANY of these shapes:
+            - {"doi": "10.1038/nature01234"}                  (preferred)
+            - {"arxiv_id": "2301.12345"}                      (preferred)
+            - "10.1038/nature01234"                           (raw DOI string)
+            - "2301.12345" / "2301.12345v2"                   (raw arXiv ID)
+            - "arxiv:2301.12345" / "doi:10.1038/..."          (prefixed)
+            - "https://doi.org/10.1038/..."                   (URL form)
+            - Full paper object from search_papers result    (DOI/arxiv auto-extracted)
+            Mixing shapes in one list is fine.
+            Example: [{"doi": "10.5281/zenodo.18418625"}, "2301.12345", "10.1007/978-3-031-97177-8_10"]
         """
-        # Models sometimes pass papers as a JSON string instead of a list
+        # Phase 2.12: harden arg parsing. Gemini sends many shapes depending on
+        # how it parsed search_papers output. _normalize_paper_arg coerces
+        # everything into the canonical {doi?, arxiv_id?} dict the MCP server
+        # expects. Replaces the prior code that crashed on string entries with
+        # 'str object has no attribute get'.
         if isinstance(papers, str):
             try:
-                papers = json.loads(papers)
+                parsed = json.loads(papers)
+                papers = parsed if isinstance(parsed, list) else [parsed]
             except (json.JSONDecodeError, TypeError):
-                return json.dumps(
-                    {"error": "papers must be a list of dicts, got unparseable string."}
-                )
-        if not papers:
-            return json.dumps(
-                {
-                    "error": "papers list is empty -- provide at least one {'doi': '...'} or {'arxiv_id': '...'}"
-                }
-            )
-        count = len(papers)
+                # Could be a single raw DOI/arxiv-id string — wrap it
+                papers = [papers]
+        if isinstance(papers, dict):
+            papers = [papers]
+        if papers is None or not isinstance(papers, list):
+            return json.dumps({
+                "error": "papers must be a list. Got: " + type(papers).__name__,
+                "hint": "Pass a list of {'doi': '...'} dicts or DOI strings.",
+            })
+        if len(papers) == 0:
+            return json.dumps({
+                "error": "papers list is empty.",
+                "hint": "Call search_papers first, then pass at least one DOI/arxiv_id from the results.",
+            })
+
+        normalized: List[Dict[str, str]] = []
+        skipped: List[Any] = []
+        for entry in papers:
+            n = _normalize_paper_arg(entry)
+            if n:
+                normalized.append(n)
+            else:
+                skipped.append(entry)
+
+        if not normalized:
+            sample = json.dumps(papers, default=str)[:300]
+            return json.dumps({
+                "error": "No valid paper identifiers found in input.",
+                "hint": "Each entry must contain a DOI (e.g. '10.1038/...') or arXiv ID (e.g. '2301.12345'), either as a string or in a {'doi': ...} / {'arxiv_id': ...} dict.",
+                "received": sample,
+            })
+
+        count = len(normalized)
         if count == 1:
-            p = papers[0]
+            p = normalized[0]
             await _emit(__event_emitter__, "⬇️ Downloading paper...")
-            args: Dict[str, Any] = {}
-            if p.get("doi"):
-                args["doi"] = p["doi"]
-            if p.get("arxiv_id"):
-                args["arxiv_id"] = p["arxiv_id"]
-            if not args:
-                return json.dumps(
-                    {"error": "Each paper needs a 'doi' or 'arxiv_id' key"}
-                )
             result = await _call_mcp(
                 self.valves,
                 self.valves.papers_url,
                 "download",
-                args,
+                p,  # already a clean {doi?, arxiv_id?} dict
                 self.valves.papers_timeout,
             )
             await _emit(__event_emitter__, "✅ Download complete", done=True)
@@ -788,7 +799,7 @@ class Tools:
                 self.valves,
                 self.valves.papers_url,
                 "batch_download",
-                {"papers": papers},
+                {"papers": normalized},
                 self.valves.papers_timeout,
             )
             await _emit(__event_emitter__, f"✅ {count} downloads complete", done=True)
@@ -812,27 +823,21 @@ class Tools:
         :param references: List of citation strings or DOIs. Example: ["Bonse et al., J Laser Appl 2012...", "10.1103/PhysRevB.73.035439"]
         :param text: Alternative: paste all references as a single string, one per line. The tool will split them automatically.
         """
-        # ── Normalize input: ensure references is a list of strings ──
-        # Models (especially Gemini) often pass the entire text block as
-        # `references` (a string) instead of a list. Detect and fix.
         if isinstance(references, str):
-            text = references  # redirect to text-splitting path
+            text = references
             references = None
         if not references and text:
-            # Split on newlines, strip numbering prefixes like "1.", "1)", "[1]", "- "
             lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
             references = [
                 re.sub(r"^\s*[\[\(]?\d+[\]\)\.:\-]\s*", "", l).strip() for l in lines
             ]
-            references = [r for r in references if len(r) > 5]  # drop junk lines
+            references = [r for r in references if len(r) > 5]
         if not references:
             return json.dumps(
                 {
                     "error": "No references provided. Pass either 'references' (list) or 'text' (one reference per line)."
                 }
             )
-        # Papers v5.1 handles up to 50 refs in one call with its own
-        # semaphore-based concurrency — no need to batch in skills.
         count = len(references)
         await _emit(
             __event_emitter__,
@@ -849,97 +854,6 @@ class Tools:
         return result
 
     # -- create_document --
-
-    async def create_document(
-        self,
-        format: Optional[str] = None,
-        filename: Optional[str] = None,
-        content: Optional[list] = None,
-        title: Optional[str] = None,
-        persistent: Optional[bool] = None,
-        __user__: Optional[dict] = None,
-        __event_emitter__: Optional[Any] = None,
-        **kwargs,
-    ) -> str:
-        """
-        Create a document (DOCX, PDF, XLSX, CSV, PPTX, HTML, TXT, MD, PY, JSON, etc.).
-        :param format: File format (docx, pdf, xlsx, csv, pptx, html, txt, md, py, json).
-        :param filename: Output filename (e.g. "report.docx").
-        :param content: Content blocks list or raw string for plain formats.
-        :param title: Optional document title.
-        :param persistent: Keep file for later download (default true).
-        """
-        missing = [
-            p
-            for p, v in [
-                ("format", format),
-                ("filename", filename),
-                ("content", content),
-            ]
-            if not v
-        ]
-        if missing:
-            return json.dumps(
-                {
-                    "error": f"Missing required parameters: {', '.join(missing)}. All three (format, filename, content) are required."
-                }
-            )
-        persistent = persistent if persistent is not None else True
-        await _emit(__event_emitter__, f"📝 Creating {format.upper()}: {filename}...")
-        args: Dict[str, Any] = {
-            "format": format,
-            "filename": filename,
-            "content": content,
-            "persistent": persistent,
-        }
-        if title:
-            args["title"] = title
-        result = await _call_mcp(
-            self.valves,
-            self.valves.files_url,
-            "create_file",
-            args,
-            self.valves.default_timeout,
-            _get_user_token(__user__) or self.valves.files_admin_token or None,
-        )
-        await _emit(__event_emitter__, f"✅ {filename} created", done=True)
-        return result
-
-    # -- read_document --
-
-    async def read_document(
-        self,
-        file_id: Optional[str] = None,
-        file_name: Optional[str] = None,
-        __user__: Optional[dict] = None,
-        __event_emitter__: Optional[Any] = None,
-        **kwargs,
-    ) -> str:
-        """
-        Read the full structure of a document (DOCX, XLSX, PPTX). Call this BEFORE editing.
-        :param file_id: The OWUI file ID from upload.
-        :param file_name: Filename with extension (e.g. "report.docx").
-        """
-        if not file_id or not file_name:
-            missing = [
-                p for p, v in [("file_id", file_id), ("file_name", file_name)] if not v
-            ]
-            return json.dumps(
-                {"error": f"Missing required parameters: {', '.join(missing)}"}
-            )
-        await _emit(__event_emitter__, f"📖 Reading: {file_name}...")
-        result = await _call_mcp(
-            self.valves,
-            self.valves.files_url,
-            "full_context_document",
-            {"file_id": file_id, "file_name": file_name},
-            self.valves.default_timeout,
-            _get_user_token(__user__) or self.valves.files_admin_token or None,
-        )
-        await _emit(__event_emitter__, "✅ Document read complete", done=True)
-        return result
-
-    # -- fetch_url --
 
     async def fetch_url(
         self,

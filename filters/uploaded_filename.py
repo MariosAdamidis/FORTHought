@@ -1,6 +1,7 @@
 """
 title: Files Metadata (IDs for tools)
-author: Marios Adamidis (FORTHought Lab)
+author: GlissemanTV (original), Marios Adamidis (adapted)
+author_url: https://openwebui.com/u/GlissemanTV
 version: 1.0.0
 """
 

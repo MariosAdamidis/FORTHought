@@ -744,11 +744,11 @@ services:
   #     - DB_POSTGRESDB_DATABASE=n8n_workflows
   #     - DB_POSTGRESDB_USER=${N8N_DB_USER}
   #     - DB_POSTGRESDB_PASSWORD=${N8N_DB_PASSWORD}
-  #     - N8N_HOST=agents.forthought.cc
+  #     - N8N_HOST=agents.example.com
   #     - N8N_PORT=5678
   #     - N8N_PROTOCOL=https
-  #     - WEBHOOK_URL=https://agents.forthought.cc/
-  #     - N8N_EDITOR_BASE_URL=https://agents.forthought.cc/
+  #     - WEBHOOK_URL=https://agents.example.com/
+  #     - N8N_EDITOR_BASE_URL=https://agents.example.com/
   #   volumes:
   #     - n8n_data:/home/node/.n8n
   #   depends_on: [postgres_n8n]
