@@ -4,7 +4,7 @@ title: "FORTHought"
 authors:
   - family-names: "Adamidis"
     given-names: "Marios"
-    orcid: "https://orcid.org/0000-0000-0000-0000"
+    orcid: "https://orcid.org/0000-0002-8915-2013"
   - family-names: "Katrisioti"
     given-names: "Danae"
   - family-names: "Tzitzikas"
@@ -29,4 +29,4 @@ preferred-citation:
   title: "It's not the Language Model, it's the Tool: Deterministic Mediation for Scientific Workflows"
   year: 2026
   journal: "arXiv preprint"
-  doi: "XXXX.XXXXX"
+  doi: "2605.13245"

@@ -10,12 +10,12 @@
       <a href="https://github.com/MariosAdamidis/FORTHought/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
       <a href="#"><img src="https://img.shields.io/badge/AMD-ROCm%20Ready-red.svg" alt="AMD ROCm Ready"></a>
       <a href="#"><img src="https://img.shields.io/badge/GPU-2×%20R9700%20%2B%207900%20XT-orange.svg" alt="AMD GPUs"></a>
-      <a href="https://arxiv.org/abs/XXXX.XXXXX"><img src="https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg" alt="arXiv paper"></a>
+      <a href="https://arxiv.org/abs/2605.13245"><img src="https://img.shields.io/badge/arXiv-2605.13245-b31b1b.svg" alt="arXiv paper"></a>
     </td>
   </tr>
 </table>
 
-> **Paper:** M. Adamidis, D. Katrisioti, Y. Tzitzikas, E. Stratakis, *"It's not the Language Model, it's the Tool: Deterministic Mediation for Scientific Workflows"* — [arXiv:XXXX.XXXXX](https://arxiv.org/abs/XXXX.XXXXX) (2026). The paper evaluates how typed tool mediation produces identical scientific results across runs while code-generating approaches vary. The [OriginMCP](#originmcp--originlab-automation) and [SEM Micro](#sem-micro--electron-microscopy-fft-analysis) servers in this repository are the tools evaluated in the paper.
+> **Paper:** M. Adamidis, D. Katrisioti, Y. Tzitzikas, E. Stratakis, *"It's not the Language Model, it's the Tool: Deterministic Mediation for Scientific Workflows"* — [arXiv:2605.13245](https://arxiv.org/abs/2605.13245) (2026). The paper evaluates how typed tool mediation produces identical scientific results across runs while code-generating approaches vary. The [OriginMCP](#originmcp--originlab-automation) and [SEM Micro](#sem-micro--electron-microscopy-fft-analysis) servers in this repository are the tools evaluated in the paper.
 
 ---
 
@@ -112,7 +112,7 @@ These are the MCP tool servers built for the lab's workflows. Each runs as a sta
 
 **Server:** [`mcp-servers/origin/server.py`](mcp-servers/origin/server.py) (3300+ lines)
 
-Automates OriginPro through its COM API, allowing the model to inspect, analyze, and fit spectroscopy data from OPJ project files. This is the photoluminescence tool evaluated in the [paper](https://arxiv.org/abs/XXXX.XXXXX).
+Automates OriginPro through its COM API, allowing the model to inspect, analyze, and fit spectroscopy data from OPJ project files. This is the photoluminescence tool evaluated in the [paper](https://arxiv.org/abs/2605.13245).
 
 - Inspect OPJ file structure and column metadata (user-defined parameters: strain, polarization, power)
 - Fit peaks: single or two-peak decomposition across Lorentzian, Gaussian, Voigt lineshapes
@@ -126,7 +126,7 @@ Runs on Windows (requires OriginPro). Accessible to the Docker stack via Tailsca
 
 **Server:** [`mcp-servers/micro/server.py`](mcp-servers/micro/server.py)
 
-FFT-based periodicity and particle size analysis for SEM images. This is the scanning electron microscopy tool evaluated in the [paper](https://arxiv.org/abs/XXXX.XXXXX).
+FFT-based periodicity and particle size analysis for SEM images. This is the scanning electron microscopy tool evaluated in the [paper](https://arxiv.org/abs/2605.13245).
 
 - Reads magnification from the SEM info bar via VLM
 - 2D FFT with radial averaging and peak detection
@@ -373,7 +373,7 @@ FORTHought/
 - [x] Parallel embedding proxy
 - [x] Docling GPU acceleration on ROCm with Qwen3-VL
 - [x] Markdown normalizer for output cleanup
-- [x] Typed mediation pattern evaluated across 4 platforms ([paper](https://arxiv.org/abs/XXXX.XXXXX))
+- [x] Typed mediation pattern evaluated across 4 platforms ([paper](https://arxiv.org/abs/2605.13245))
 - [x] Open WebUI 0.9.5 with custom patches
 - [x] Event-driven tool-call UI panels in production pipes
 
@@ -441,7 +441,7 @@ If you use ideas or code from FORTHought, please cite:
   author = {Adamidis, Marios and Katrisioti, Danae and Tzitzikas, Yannis and Stratakis, Emmanuel},
   title  = {It's not the Language Model, it's the Tool: Deterministic Mediation for Scientific Workflows},
   year   = {2026},
-  eprint = {XXXX.XXXXX},
+  eprint = {2605.13245},
   archivePrefix = {arXiv},
   primaryClass  = {cs.AI}
 }
